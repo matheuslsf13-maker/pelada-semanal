@@ -1,0 +1,973 @@
+:root {
+  /* ==================================================================
+     DOIS TEMAS
+
+     `:root` traz o tema CLARO e `[data-tema="escuro"]` troca so os
+     valores -- nenhum componente sabe qual tema esta valendo, todos leem
+     os mesmos nomes. Quem escolhe e a pessoa, no botao do cabecalho, e a
+     escolha fica guardada no proprio celular.
+
+     Duas cores NAO mudam de tema, e por isso tem nome proprio:
+     `--sempre-claro` e `--sempre-escuro`. Sao o texto de superficies que
+     ja tem cor propria nos dois temas -- o cabecalho escuro, o selo rosa,
+     o degrau dourado do podio. Sem elas, o texto do cabecalho sumia ao
+     trocar de tema (foi exatamente esse o bug quando o app virou escuro).
+     ================================================================== */
+
+  /* ---- superficies e texto (tema claro) ---- */
+  --fundo:   #f3f6f7;
+  --fundo-2: #ffffff;
+  --card:    #ffffff;
+  --card-2:  #e9eef1;
+  --line:    #dbe2e6;
+  --line-2:  #bfcad1;
+  --text:    #15232b;
+  --muted:   #5b6b76;
+
+  /* ---- marca: PROVISORIA. Areia, mar e noite de quadra -- neutra de
+     proposito, ate o grupo trazer as cores dele. Trocar aqui muda o app
+     inteiro, porque nenhum componente conhece cor: todos leem estes nomes. ---- */
+  --marca:   #0d7c8a;
+  --apoio:   #3f5a8a;
+  --ouro:    #c07f00;
+  --bronze:  #b05f2a;
+  --verde:   #16794f;
+  --danger:  #c0392b;
+  --degrade: linear-gradient(100deg, #3f5a8a 0%, #0d7c8a 55%, #16794f 100%);
+
+  /* ---- fundos suaves de cada cor ---- */
+  --marca-suave:  rgba(13, 124, 138, 0.11);
+  --apoio-suave:  rgba(63, 90, 138, 0.11);
+  --ouro-suave:   rgba(192, 127, 0, 0.14);
+  --bronze-suave: rgba(176, 95, 42, 0.13);
+  --verde-suave:  rgba(22, 121, 79, 0.12);
+  --danger-suave: rgba(192, 57, 43, 0.11);
+
+  /* ---- as duas que nao mudam de tema ---- */
+  --sempre-claro:  #f2f7f9;
+  --sempre-escuro: #0f1c23;
+
+  --radius: 18px;
+  --shadow: 0 8px 24px rgba(20, 26, 60, 0.10);
+  color-scheme: light;
+}
+
+:root[data-tema="escuro"] {
+  /* a quadra a noite: azul profundo, sob a luz do refletor */
+  --fundo:   #0c151a;
+  --fundo-2: #132029;
+  --card:    #172630;
+  --card-2:  #1e313d;
+  --line:    rgba(232, 241, 245, 0.14);
+  --line-2:  rgba(232, 241, 245, 0.28);
+  --text:    #e8f1f5;
+  /* cinza puxado para o azul da marca: escolhido, nao herdado */
+  --muted:   #93a8b4;
+
+  /* no escuro a marca precisa de mais brilho para nao apagar */
+  --marca:   #2dd4bf;
+  --apoio:   #7dd3fc;
+  --ouro:    #fbbf24;
+  --bronze:  #fb923c;
+  --verde:   #34d399;
+  --danger:  #f87171;
+  --degrade: linear-gradient(100deg, #7dd3fc 0%, #2dd4bf 55%, #34d399 100%);
+
+  --marca-suave:  rgba(45, 212, 191, 0.16);
+  --apoio-suave:  rgba(125, 211, 252, 0.16);
+  --ouro-suave:   rgba(251, 191, 36, 0.14);
+  --bronze-suave: rgba(251, 146, 60, 0.14);
+  --verde-suave:  rgba(52, 211, 153, 0.14);
+  --danger-suave: rgba(248, 113, 113, 0.15);
+
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.40);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  overscroll-behavior-y: none; /* sem "puxar" a pagina no iPhone */
+  -webkit-tap-highlight-color: transparent;
+  background: var(--fundo);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 14px calc(96px + env(safe-area-inset-bottom));
+}
+
+/* ---------- topo ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -14px 14px;
+  /* instalado na tela de inicio o app ocupa a area do relogio/notch:
+     sem esta folga o botao Entrar fica embaixo da barra de status */
+  padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+  background: linear-gradient(135deg, var(--fundo-2) 0%, #123845 100%);
+  color: var(--text);
+  border-radius: 0 0 22px 22px;
+  box-shadow: 0 6px 20px rgba(20, 26, 60, 0.25);
+}
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.topbar h1 span { color: var(--marca); }
+.topbar .sub {
+  margin-top: 2px;
+  font-size: 12px;
+  /* o cabecalho e escuro nos dois temas, entao esta cor nao acompanha o tema */
+  color: rgba(255, 246, 238, .74);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.dot.on { background: var(--verde); }
+.dot.off { background: var(--bronze); }
+
+/* ---------- navegacao ---------- */
+.tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 30;
+  display: flex;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 18px rgba(20, 26, 60, 0.08);
+}
+.tabbar button {
+  flex: 1;
+  border: 0;
+  background: none;
+  padding: 8px 2px;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+.tabbar button .ic { font-size: 19px; line-height: 1; }
+.tabbar button.active { color: var(--marca); background: var(--marca-suave); }
+
+/* ---------- blocos ---------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+/* cartao de destaque: no tema escuro ele nao pode ser "mais escuro",
+   entao ganha a borda do por do sol para se separar dos outros */
+.card.dark {
+  background: var(--fundo-2);
+  color: var(--text);
+  border: 1px solid var(--line-2);
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin: 4px 2px 10px;
+  color: var(--text);
+}
+.card.dark .section-title { color: var(--text); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.tiny { font-size: 11px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row.wrap { flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- controles ---------- */
+.btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 15px;
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--sempre-escuro);
+  color: var(--sempre-claro);
+  cursor: pointer;
+  transition: filter .15s, transform .05s;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.marca { background: var(--marca); }
+.btn.apoio { background: var(--apoio); }
+.btn.verde { background: var(--verde); }
+.btn.ghost { background: var(--card-2); color: var(--text); border: 1px solid var(--line); }
+.btn.danger { background: var(--danger-suave); color: var(--danger); }
+.btn.sm { padding: 7px 11px; font-size: 12.5px; border-radius: 10px; }
+.btn.block { width: 100%; }
+
+.input, .select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  border-radius: 12px;
+  padding: 11px 12px;
+  outline: none;
+}
+.input:focus, .select:focus { border-color: var(--marca); background: var(--card-2); }
+label.field { display: block; }
+label.field > span {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.chip.on { background: var(--marca); border-color: var(--marca); color: var(--sempre-escuro); }
+.chip.off { opacity: .75; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+.badge.open { background: var(--ouro-suave); color: var(--ouro); }
+.badge.finished { background: var(--verde-suave); color: var(--verde); }
+/* play avulso: acontece, conta no historico, mas nao vale para o campeonato */
+.badge.avulso { background: var(--apoio-suave); color: var(--apoio); }
+
+/* ---------- avatar ---------- */
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(135deg, var(--apoio), var(--marca));
+  color: var(--sempre-claro);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  flex: none;
+  overflow: hidden;
+}
+
+/* ---------- podio ---------- */
+.podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: end;
+  gap: 8px;
+  margin-top: 6px;
+}
+/* `min-width: 0` e o que faz o nome comprido virar reticencia. Sem isso a
+   coluna do grid cresce ate caber o nome inteiro e o podio perde a proporcao:
+   um "Mariana Valerio dos Santos" no 2o lugar deixava a coluna dele mais larga
+   que a do 1o. */
+.podium .slot { text-align: center; min-width: 0; }
+.podium .base {
+  margin-top: 8px;
+  border-radius: 14px 14px 0 0;
+  padding: 8px 4px 10px;
+  font-weight: 800;
+  color: var(--sempre-escuro);
+  /* Alturas MINIMAS, nao fixas. Com `height` o degrau do 3o lugar tinha 46px
+     para um conteudo de 53px, e o "13 pts" caia 7px para fora da barra --
+     ficava solto no fundo do cartao, parecendo defeito. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1px;
+}
+.podium .p1 .base { background: linear-gradient(180deg, var(--ouro), #a86e00); min-height: 84px; }
+.podium .p2 .base { background: linear-gradient(180deg, #c8d2d8, #93a2ac); min-height: 66px; }
+.podium .p3 .base { background: linear-gradient(180deg, #d99668, var(--bronze)); min-height: 56px; }
+.podium .pos, .podium .pts { line-height: 1.15; }
+.podium .pos { font-size: 22px; }
+.podium .pts { font-size: 11px; font-weight: 700; opacity: .9; }
+.podium .nm { font-size: 12px; font-weight: 700; margin-top: 6px; }
+
+/* ---------- ranking ---------- */
+.rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-bottom: 1px dashed var(--line);
+}
+.rank-row:last-child { border-bottom: 0; }
+.rank-pos {
+  width: 26px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--muted);
+  flex: none;
+}
+.rank-row.top1 .rank-pos { color: var(--ouro); }
+.rank-row.top2 .rank-pos { color: var(--muted); }
+.rank-row.top3 .rank-pos { color: var(--bronze); }
+.rank-pts { font-weight: 800; color: var(--marca); font-size: 17px; }
+
+/* ---------- partidas ---------- */
+.match {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--card);
+}
+.match.done { background: var(--fundo-2); border-color: var(--line); }
+.match-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.team { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.team .names { flex: 1; font-weight: 700; font-size: 14px; }
+.team.win .names { color: var(--verde); }
+.team.lose .names { color: var(--muted); }
+.score-input {
+  width: 46px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 4px;
+  font-weight: 800;
+  background: var(--card-2);
+}
+.vs { text-align: center; font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: 2px; }
+
+/* ---------- tabelas ---------- */
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th, .table td { padding: 7px 6px; text-align: right; }
+.table th:first-child, .table td:first-child { text-align: left; }
+.table thead th {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.table tbody tr { border-bottom: 1px dashed var(--line); }
+.table tbody tr:last-child { border-bottom: 0; }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat-box {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  text-align: center;
+}
+.stat-box .v { font-size: 19px; font-weight: 800; color: var(--text); }
+.stat-box .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+
+.empty {
+  text-align: center;
+  padding: 26px 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.empty .big { font-size: 34px; display: block; margin-bottom: 8px; }
+
+.banner {
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.banner.warn { background: var(--ouro-suave); color: var(--ouro); }
+.banner.err { background: var(--danger-suave); color: var(--danger); }
+.banner.info { background: var(--apoio-suave); color: var(--text); }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  background: var(--sempre-escuro);
+  color: var(--sempre-claro);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 60;
+  box-shadow: var(--shadow);
+}
+
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 26, 60, .5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+  padding: 12px;
+}
+.modal {
+  background: var(--card);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  padding: 16px;
+  max-height: 86vh;
+  overflow: auto;
+}
+@media (min-width: 560px) { .modal-bg { align-items: center; } }
+
+hr.sep { border: 0; border-top: 1px dashed var(--line); margin: 12px 0; }
+
+/* status maximo: 10 plays seguidos vencendo */
+.row.queen {
+  background: linear-gradient(135deg, var(--ouro-suave), var(--ouro-suave));
+  border: 1px solid var(--ouro);
+  border-radius: 14px;
+  padding: 8px 10px;
+}
+.row.queen .badge.open { background: var(--fundo-2); color: var(--ouro); }
+
+/* ---------- lancamento de placar no celular ---------- */
+.round-nav { padding: 12px; position: sticky; top: calc(74px + env(safe-area-inset-top)); z-index: 15; }
+.chips-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px;
+}
+.chips-scroll::-webkit-scrollbar { display: none; }
+.round-chip {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.round-chip.done { background: var(--verde-suave); border-color: var(--verde); color: var(--verde); }
+.round-chip.on { background: var(--marca); border-color: var(--marca); color: var(--sempre-escuro); }
+.btn.step { width: 40px; height: 40px; padding: 0; font-size: 20px; line-height: 1; flex: none; }
+
+.match.live { border-color: var(--marca); box-shadow: 0 2px 10px rgba(239, 75, 125, .08); }
+
+.pick-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+}
+.pick-team:active { background: var(--marca-suave); border-color: var(--marca); }
+/* placar so depois de "partida iniciada": sem isso da para lancar por engano
+   a partida da quadra errada, e ela fica gravada sem quadra e sem horario */
+.pick-team:disabled { opacity: .5; cursor: not-allowed; }
+.pick-team:disabled .pick-tag { background: var(--muted); }
+.pick-team .names { flex: 1; font-weight: 700; font-size: 15px; }
+.pick-tag {
+  flex: none;
+  background: var(--marca);
+  color: var(--sempre-escuro);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.ask { font-size: 13.5px; margin: 10px 2px 8px; color: var(--text); }
+.games-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); gap: 8px; }
+.game-btn {
+  min-height: 54px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: var(--card-2);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  cursor: pointer;
+}
+.game-btn:active { background: var(--marca); border-color: var(--marca); color: var(--sempre-escuro); }
+
+.score-box {
+  flex: none;
+  min-width: 40px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--text);
+}
+.pts-tag { flex: none; font-size: 11px; font-weight: 800; color: var(--marca); }
+.linkish {
+  border: 0;
+  background: none;
+  color: var(--marca);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  cursor: pointer;
+  padding: 0;
+}
+/* dentro de um texto corrido a acao vira link, nao etiqueta */
+.tiny .linkish {
+  font-size: inherit;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  text-decoration: underline;
+}
+
+/* ---------- indicador de sincronizacao ---------- */
+.sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sync .dot { width: 7px; height: 7px; }
+.sync.saving .dot { background: var(--ouro); }
+.sync.pending .dot { background: var(--bronze); }
+.sync.saved .dot { background: var(--verde); }
+
+/* no computador a barra de abas acompanha a coluna do app */
+@media (min-width: 760px) {
+  .tabbar {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 720px;
+    border-radius: 18px 18px 0 0;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+  }
+}
+
+/* dica curta embaixo dos campos do formulario */
+.hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* opção destacada dentro de um formulário */
+.toggle-card {
+  border: 1.5px solid var(--marca);
+  background: var(--marca-suave);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.toggle-card input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--marca); flex: none; }
+.input:disabled { background: var(--card-2); color: var(--muted); }
+
+/* linha de decisão do fechamento do mês */
+.bet-row {
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: var(--card-2);
+}
+
+/* campo numérico com − e + (bem melhor que digitar no celular) */
+.stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.stepper button {
+  flex: none;
+  width: 42px;
+  border: 0;
+  background: var(--card-2);
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.stepper button:active:not(:disabled) { background: var(--marca); color: var(--sempre-escuro); }
+.stepper button:disabled { opacity: .3; cursor: not-allowed; }
+.stepper input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 11px 2px;
+  outline: none;
+}
+.stepper.off { opacity: .6; }
+.stepper.off button { background: var(--card-2); }
+.hint.aviso { color: var(--bronze); font-weight: 700; }
+
+/* selo do campeonato na tela inicial */
+.card.hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, var(--card) 60%, var(--marca-suave));
+  border-color: var(--marca-suave);
+}
+.hero-txt { min-width: 0; }
+.hero-nome {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: .3px;
+  background: linear-gradient(90deg, var(--apoio), var(--marca), var(--bronze));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.topbar img, .topbar svg { filter: drop-shadow(0 2px 6px rgba(0,0,0,.3)); }
+
+/* ---------- estatísticas ---------- */
+.segmented {
+  display: flex;
+  gap: 4px;
+  background: var(--card-2);
+  border-radius: 14px;
+  padding: 4px;
+}
+.segmented button {
+  flex: 1;
+  border: 0;
+  background: none;
+  border-radius: 11px;
+  padding: 10px 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--muted);
+  cursor: pointer;
+}
+.segmented button.on { background: var(--degrade); color: var(--sempre-escuro); }
+
+.barra {
+  height: 10px;
+  border-radius: 99px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.barra i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--apoio), var(--marca));
+}
+.mini-barra {
+  display: block;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--card-2);
+  overflow: hidden;
+  margin: 5px 0 4px;
+}
+.mini-barra i { display: block; height: 100%; background: linear-gradient(90deg, var(--apoio), var(--marca)); }
+
+.duo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 10px;
+  cursor: pointer;
+}
+.duo-row:active { background: var(--marca-suave); border-color: var(--marca); }
+.duo-fotos { display: flex; flex: none; }
+.duo-fotos > :last-child { margin-left: -10px; border: 2px solid var(--card); border-radius: 50%; }
+.duo-nomes { display: block; font-weight: 700; font-size: 14px; }
+.duo-pct { flex: none; font-weight: 800; color: var(--marca); font-size: 16px; }
+
+/* conferência da lista importada */
+.import-row {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--card-2);
+}
+.import-row.atencao { border-color: var(--bronze); background: var(--bronze-suave); }
+textarea.input { line-height: 1.45; }
+
+/* cartão do próximo play, na tela inicial */
+.card.proximo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 1.5px solid var(--marca);
+  background: linear-gradient(135deg, var(--card), var(--marca-suave));
+}
+.prox-selo {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--marca);
+  color: var(--sempre-escuro);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prox-titulo {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--marca);
+}
+.prox-info { display: block; font-weight: 700; font-size: 14px; color: var(--text); }
+.prox-acao { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* rodapé discreto com a versão, para dar suporte a quem travar */
+.versao {
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--muted);
+  margin: 18px 0 4px;
+}
+.versao .linkish { font-size: 10.5px; color: var(--muted); text-transform: none; letter-spacing: 0; text-decoration: underline; }
+
+/* troca de jogador e quadra travada */
+.nome-troca {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--line);
+}
+.nome-troca.ocupada { color: var(--bronze); border-bottom-color: var(--bronze); }
+.travada {
+  background: var(--bronze-suave);
+  border: 1px solid var(--bronze);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--bronze);
+}
+.match.travada-borda { border-color: var(--bronze); }
+
+/* partida em quadra agora */
+.match.em-quadra {
+  border-color: var(--verde);
+  background: var(--verde-suave);
+}
+
+/* ---------- fila de partidas (o play nao tem mais rodadas) ---------- */
+.match.vazia { background: var(--card-2); border-style: dashed; }
+
+/* etiqueta de grupo, quando o play e dividido por nivel */
+.grupo-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--sempre-escuro);
+  vertical-align: middle;
+}
+.grupo-tag.g1 { background: var(--marca); }
+.grupo-tag.g2 { background: var(--apoio); }
+.grupo-tag.g3 { background: var(--verde); }
+.grupo-tag.g4 { background: var(--bronze); }
+.repetida-tag { margin-left: 6px; }
+
+.grupo-box {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--marca);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--card-2);
+}
+.grupo-nome {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--marca);
+  margin-bottom: 2px;
+}
+.grupo-box + .grupo-box .grupo-nome { color: var(--apoio); }
+.grupo-box + .grupo-box { border-left-color: var(--apoio); }
+
+/* linha compacta da fila e das partidas ja jogadas */
+.fila-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+}
+.fila-linha:last-child { border-bottom: 0; padding-bottom: 0; }
+.fila-num {
+  flex: none;
+  min-width: 30px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.fila-time {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.fila-time.venceu { font-weight: 800; color: var(--verde); }
+/* os avisos de cada linha ficam um por linha, senao colam no anterior */
+.fila-linha .tiny { display: block; line-height: 1.35; }
+.fila-time b { color: var(--text); }
+.fila-time i { font-style: normal; font-size: 11px; font-weight: 800; color: var(--marca); }
+
+/* nomes das duplas na partida: quebram em vez de serem cortados, senao no
+   celular nao da para ler (nem tocar) quem tem nome comprido */
+.team .names,
+.pick-team .names { overflow-wrap: anywhere; }
+
+/* o selo "venceu" encolhe para sobrar largura para os nomes */
+.pick-tag { padding: 5px 9px; font-size: 11px; letter-spacing: .2px; }
+.pick-team { gap: 6px; padding: 10px; }
+.pick-team .names { font-size: 14px; }
+.names .ocupada { color: var(--bronze); font-weight: 800; }
+
+/* opcao "play avulso" no formulario, em roxo para nao virar mais um cartao rosa */
+.toggle-card.avulso { border-color: var(--apoio); background: var(--apoio-suave); }
+.toggle-card.avulso input[type='checkbox'] { accent-color: var(--apoio); }
+
+/* finalizar o mes na mao */
+.fechamento {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+/* botao de trocar entre o modo diurno e o noturno, no cabecalho */
+.bt-tema {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 246, 238, .28);
+  background: rgba(255, 246, 238, .12);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.bt-tema:active { background: rgba(255, 246, 238, .22); }
+
+/* atalho de instalar, na linha de status do cabecalho. Como botao redondo ao
+   lado do tema ele apertava o titulo e custava 43px de altura -- num cabecalho
+   fixo, isso e 43px em toda tela do app. Aqui custa 5px. */
+.chip-topo {
+  flex: none;
+  border: 1px solid rgba(255, 246, 238, .3);
+  background: rgba(255, 246, 238, .14);
+  /* o cabecalho e escuro nos dois temas, entao a cor nao acompanha o tema */
+  color: rgba(255, 246, 238, .92);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.chip-topo:active { background: rgba(255, 246, 238, .24); }
+
+.prox-abrir {
+  flex: none;
+  align-self: center;
+  background: var(--apoio);
+  color: var(--sempre-escuro);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
