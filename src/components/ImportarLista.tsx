@@ -8,18 +8,25 @@ import { Avatar, Modal } from './ui'
 type Resultado = { criados: string[]; apelidos: { playerId: string; alias: string }[] }
 
 /**
- * Cola a lista de confirmacao do grupo e transforma em presenca no play:
- * casa os nomes com a base, deixa a organizador conferir os duvidosos e
- * cria quem ainda nao existe.
+ * Cola a lista do grupo, casa os nomes com a base, deixa a organizacao
+ * conferir os duvidosos e cria quem ainda nao existe.
+ *
+ * Serve as duas telas porque a parte dificil -- reconhecer que "Tete" e a
+ * mesma pessoa de "Tete 12" -- e a mesma nas duas. So muda o fim:
+ *
+ *   play      marca presenca no play que esta sendo montado.
+ *   cadastro  so cadastra quem falta, na aba Jogadores, sem tocar em play.
  */
 export default function ImportarLista({
   onAplicar,
   onClose,
   onToast,
+  modo = 'play',
 }: {
-  onAplicar: (playerIds: string[]) => void
+  onAplicar?: (playerIds: string[]) => void
   onClose: () => void
   onToast: (m: string) => void
+  modo?: 'play' | 'cadastro'
 }) {
   const { data, savePlayer, deletePlayer } = useStore()
   const [texto, setTexto] = useState('')
@@ -81,7 +88,7 @@ export default function ImportarLista({
         criados.push(nova.id)
       }
     }
-    onAplicar(escolhidas)
+    onAplicar?.(escolhidas)
     setFeito({ criados, apelidos })
   }
 
@@ -92,7 +99,7 @@ export default function ImportarLista({
       const p = data.players.find((x) => x.id === playerId)
       if (p) savePlayer({ ...p, aliases: (p.aliases ?? []).filter((a) => a !== alias) })
     }
-    onAplicar([])
+    onAplicar?.([])
     setFeito(null)
     setItens(null)
     onToast('Importação desfeita')
@@ -103,13 +110,20 @@ export default function ImportarLista({
     return (
       <Modal title="Lista importada" onClose={onClose}>
         <div className="banner info" style={{ marginTop: 0 }}>
-          ✅ <strong>{(itens ?? []).length} jogadores</strong> marcadas para este play.
-          {feito.criados.length > 0 && <> {feito.criados.length} foram criadas agora.</>}
+          {modo === 'play' ? (
+            <>✅ <strong>{(itens ?? []).length} jogadores</strong> marcados para este play.</>
+          ) : (
+            <>✅ Conferi <strong>{(itens ?? []).length} nomes</strong> da lista.</>
+          )}
+          {feito.criados.length > 0 && (
+            <> {feito.criados.length} {feito.criados.length === 1 ? 'foi criado' : 'foram criados'} agora.</>
+          )}
+          {modo === 'cadastro' && feito.criados.length === 0 && <> Todos já estavam cadastrados.</>}
           {feito.apelidos.length > 0 && <> {feito.apelidos.length} grafia(s) guardada(s) para a próxima vez.</>}
         </div>
         {feito.criados.length > 0 && (
           <>
-            <div className="section-title">➕ Criadas nesta importação</div>
+            <div className="section-title">➕ Criados nesta importação</div>
             <div className="stack">
               {feito.criados.map((id) => {
                 const p = data.players.find((x) => x.id === id)
@@ -130,8 +144,9 @@ export default function ImportarLista({
           Pronto
         </button>
         <p className="tiny muted" style={{ marginBottom: 0 }}>
-          Se depois perceber que criou um atleta repetida, dá para juntar as duas na aba
-          <strong> Jogadores</strong> — os pontos e a sequência das duas se somam na que ficar.
+          Se depois perceber que criou um atleta repetido, dá para juntar os dois
+          {modo === 'cadastro' ? ' aqui mesmo' : <> na aba <strong>Jogadores</strong></>} — os
+          pontos e a sequência dos dois se somam no que ficar.
         </p>
       </Modal>
     )
@@ -149,8 +164,8 @@ export default function ImportarLista({
           ) : (
             <>
               Reconheci <strong>{itens.length - conferir}</strong> de {itens.length}.
-              As <strong>{conferir}</strong> destacadas abaixo eu não tenho certeza — diga se é alguém
-              que já joga ou se é atleta nova.
+              Nos <strong>{conferir}</strong> destacados abaixo eu não tenho certeza — diga se é
+              alguém que já joga ou se é atleta novo.
             </>
           )}
         </div>
@@ -164,10 +179,10 @@ export default function ImportarLista({
                 <div className="row" style={{ gap: 8 }}>
                   <strong className="grow ellipsis">{it.texto}</strong>
                   <span className="tiny nowrap" style={{ fontWeight: 800, color: atencao ? 'var(--bronze)' : 'var(--verde)' }}>
-                    {it.origem === 'exata' && 'já cadastrada'}
+                    {it.origem === 'exata' && 'já cadastrado'}
                     {it.origem === 'apelido' && 'apelido conhecido'}
-                    {it.origem === 'parecida' && !atencao && 'reconhecida'}
-                    {atencao && (it.vincularA ? 'confira' : 'nova?')}
+                    {it.origem === 'parecida' && !atencao && 'reconhecido'}
+                    {atencao && (it.vincularA ? 'confira' : 'novo?')}
                   </span>
                 </div>
                 <select
@@ -176,19 +191,19 @@ export default function ImportarLista({
                   value={it.vincularA ?? 'nova'}
                   onChange={(e) => trocar(idx, e.target.value)}
                 >
-                  <option value="nova">➕ Criar "{it.texto}" como atleta nova</option>
+                  <option value="nova">➕ Criar "{it.texto}" como atleta novo</option>
                   {it.sugestoes.length > 0 && (
                     <optgroup label="Parece com">
                       {it.sugestoes.map((s) => (
                         <option key={s.player.id} value={s.player.id}>
-                          É a {s.player.name} ({Math.round(s.score * 100)}%)
+                          É o {s.player.name} ({Math.round(s.score * 100)}%)
                         </option>
                       ))}
                     </optgroup>
                   )}
                   <optgroup label="Outros jogadores">
                     {resto.map((p) => (
-                      <option key={p.id} value={p.id}>É a {p.name}</option>
+                      <option key={p.id} value={p.id}>É o {p.name}</option>
                     ))}
                   </optgroup>
                 </select>
@@ -217,7 +232,7 @@ export default function ImportarLista({
             <p className="tiny muted" style={{ marginTop: 6, marginBottom: 0 }}>
               {CATEGORIAS.find((c) => c.valor === categoriaNovos)?.explica}. Vale só para quem for
               criado agora — quem já está cadastrado mantém a categoria dele. Dá para corrigir
-              depois em Jogadores.
+              depois {modo === 'cadastro' ? 'aqui mesmo' : 'em Jogadores'}.
             </p>
           </div>
         )}
@@ -225,7 +240,11 @@ export default function ImportarLista({
         <div className="row" style={{ gap: 8, marginTop: 14 }}>
           <button className="btn ghost grow" onClick={() => setItens(null)}>← Voltar</button>
           <button className="btn marca grow" onClick={aplicar}>
-            Confirmar {itens.length} {novas > 0 ? `(${novas} nova${novas > 1 ? 's' : ''})` : ''}
+            {modo === 'play'
+              ? `Confirmar ${itens.length}${novas > 0 ? ` (${novas} novo${novas > 1 ? 's' : ''})` : ''}`
+              : novas > 0
+                ? `Cadastrar ${novas} novo${novas > 1 ? 's' : ''}`
+                : 'Confirmar'}
           </button>
         </div>
       </Modal>
@@ -234,10 +253,22 @@ export default function ImportarLista({
 
   /* --------------------------------------------------------- colar a lista */
   return (
-    <Modal title="Colar lista do grupo" onClose={onClose}>
+    <Modal
+      title={modo === 'play' ? 'Colar lista do grupo' : 'Cadastrar vários de uma vez'}
+      onClose={onClose}
+    >
       <p className="small muted" style={{ marginTop: 0 }}>
-        Cole aqui a lista de confirmação do WhatsApp, do jeito que veio. Eu tiro a numeração e
-        procuro cada nome na base de jogadores.
+        {modo === 'play' ? (
+          <>
+            Cole aqui a lista de confirmação do WhatsApp, do jeito que veio. Eu tiro a numeração e
+            procuro cada nome na base de jogadores.
+          </>
+        ) : (
+          <>
+            Cole a lista do grupo do jeito que veio. Eu tiro a numeração, reconheço quem já está
+            cadastrado e crio só quem falta — ninguém é marcado para play nenhum.
+          </>
+        )}
       </p>
       <textarea
         className="input"

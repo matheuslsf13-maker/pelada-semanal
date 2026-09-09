@@ -128,6 +128,13 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     categoria ali mesmo e já escala. Quase todo bloqueio é cadastro errado, não
     inadimplência — e mandar a pessoa até Jogadores perderia a lista montada.
     O botão "Todos" também respeita o portão.
+- **Colar a lista do grupo** (`ImportarLista`) serve **duas** telas, com a
+  mesma conciliação de nomes e um `modo` diferente: em `play` marca presença no
+  play que está sendo montado; em `cadastro` (aba Jogadores) só cria quem falta.
+  Sem o segundo modo era preciso abrir um play só para cadastrar o grupo —
+  justamente o que se faz **uma** vez, antes da primeira noite. Nos dois modos a
+  importação guarda a grafia da lista como apelido, para a próxima reconhecer
+  sozinha, e tem **desfazer** que apaga só quem nasceu ali.
 - **Play avulso** (`sessions.ranked = false`): conta no histórico e na força,
   mas **não soma no ranking do mês nem mexe nas sequências**. Serve para o jogo
   fora de calendário que não é o campeonato.

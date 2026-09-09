@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import ImportarLista from '../components/ImportarLista'
 import { Avatar, Empty, Modal } from '../components/ui'
 import { squareThumb } from '../lib/image'
 import { playedMatches } from '../lib/stats'
@@ -22,6 +23,7 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [juntando, setJuntando] = useState<Player | null>(null)
   const [editando, setEditando] = useState<Player | null>(null)
+  const [importando, setImportando] = useState(false)
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const sorted = [...data.players].sort(
@@ -85,7 +87,7 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
     <>
       {canEdit && (
         <div className="card">
-          <div className="section-title">➕ Nova jogador</div>
+          <div className="section-title">➕ Novo jogador</div>
           <div className="row">
             <input
               className="input grow"
@@ -111,7 +113,23 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
           <p className="tiny muted" style={{ marginTop: 6, marginBottom: 0 }}>
             {CATEGORIAS.find((c) => c.valor === novaCategoria)?.explica}
           </p>
+
+          <button
+            className="btn ghost block sm"
+            style={{ marginTop: 12 }}
+            onClick={() => setImportando(true)}
+          >
+            📋 Colar a lista do grupo e cadastrar vários
+          </button>
         </div>
+      )}
+
+      {importando && (
+        <ImportarLista
+          modo="cadastro"
+          onClose={() => setImportando(false)}
+          onToast={onToast}
+        />
       )}
 
       {editando && (
