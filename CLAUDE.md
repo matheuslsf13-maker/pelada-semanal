@@ -57,7 +57,22 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   (grupos de 6, 7, 10, 11), algumas duplas repetem — escolhidas para que cada
   jogador repita a mesma quantidade (`repeticoesPorJogador`). **Quem enfrenta quem também é escolhido**, sempre pela dupla que menos
   se enfrentou até ali — o alvo é espalhar, não zerar (é impossível zerar).
-- **Dois formatos**, escolhidos ao criar o play: `todos` (rodízio único) e
+- **Três formatos**, escolhidos ao criar o play. O terceiro,
+  **`grupos-duplas`**, tem duas fases:
+  - *Fase 1*: grupos **equilibrados entre si** (`gruposEquilibrados`, serpentina)
+    — não é a divisão por nível dos outros formatos. Ser 1º precisa custar o
+    mesmo em qualquer grupo, senão a fase 2 fica injusta. Dentro do grupo, o
+    rodízio de sempre.
+  - *Fase 2*: **dupla fixa por colocação**. Ordena todos por posição no grupo
+    (os 1º primeiro, depois os 2º…) e junta os **vizinhos** dessa fila — assim
+    melhor com melhor, e com número ímpar de grupos a sobra cai no vizinho de
+    cima em vez de num nível diferente. Parceiro nunca é do mesmo grupo. As
+    duplas viram **chaves** e jogam só dentro da chave.
+  - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Sortear a
+    fase 2"), porque depende da colocação final.
+  - **Só a fase 2 vale pontos** no pódio do dia, e o pódio é **por chave**.
+  - `matches.fase` (1 ou 2) separa as duas; `sessions.duos` guarda as duplas.
+- **Dois formatos** clássicos, também escolhidos ao criar o play: `todos` (rodízio único) e
   `grupos` (o mesmo rodízio dentro de grupos formados por nível, grupo 1 com as
   mais bem pontuadas). Nos grupos os pontos continuam **individuais** e o
   ranking do dia é **um só** — mas o **pódio é um por grupo**. No fim do play a

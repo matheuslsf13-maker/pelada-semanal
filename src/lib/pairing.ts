@@ -29,6 +29,8 @@ export type PlannedMatch = {
   team_b: [string, string]
   /** Indice do grupo (0 = grupo 1). Fora do modo em grupos e sempre 0. */
   grupo: number
+  /** 1 = fase de grupos, 2 = fase das duplas fixas. Ausente conta como 1. */
+  fase?: number
   /**
    * Dupla que joga uma segunda vez porque sobrou uma dupla sem adversaria.
    * Acontece so quando o total de combinacoes do grupo e impar.
@@ -80,6 +82,128 @@ export function tamanhosDosGrupos(jogadores: number, grupos: number): number[] {
   const resto = jogadores % grupos
   // a sobra vai para os primeiros grupos, que sao os de nivel mais alto
   return Array.from({ length: grupos }, (_, i) => base + (i < resto ? 1 : 0))
+}
+
+/**
+ * Grupos EQUILIBRADOS entre si, para o formato `grupos-duplas`.
+ *
+ * Diferente do `formarGrupos`, onde o grupo 1 leva os melhores de proposito.
+ * Aqui os grupos precisam ter a mesma forca media, senao a fase 2 nao e justa:
+ * "1o com 1o" so faz sentido se ser 1o custar o mesmo em qualquer grupo.
+ *
+ * A distribuicao e em serpentina -- com a lista ordenada por forca, entrega
+ * 1-2-3-4, depois 4-3-2-1, depois 1-2-3-4. Assim cada grupo recebe um de cada
+ * faixa e as medias saem praticamente iguais.
+ */
+export function gruposEquilibrados(
+  playerIds: string[],
+  ratings: Map<string, number>,
+  tamanho: number,
+): string[][] {
+  const grupos = numeroDeGrupos(playerIds.length, tamanho)
+  if (grupos <= 1) return [playerIds.slice()]
+  const ordenados = [...playerIds].sort((a, b) => (ratings.get(b) ?? 2) - (ratings.get(a) ?? 2))
+  const out: string[][] = Array.from({ length: grupos }, () => [])
+  ordenados.forEach((id, i) => {
+    const volta = Math.floor(i / grupos)
+    const pos = i % grupos
+    out[volta % 2 === 0 ? pos : grupos - 1 - pos].push(id)
+  })
+  return out
+}
+
+/** Como um jogador terminou a fase de grupos. */
+export type Colocacao = {
+  id: string
+  /** Indice do grupo (0 = grupo 1). */
+  grupo: number
+  /** 1 = primeiro do grupo. */
+  posicao: number
+  pontos: number
+  saldo: number
+}
+
+/**
+ * FASE 2 -- as duplas fixas.
+ *
+ * Ordena todos por colocacao no grupo (os 1os primeiro, depois os 2os...) e,
+ * dentro da mesma colocacao, por desempenho. Depois junta os VIZINHOS dessa
+ * fila: melhor com melhor, medio com medio, ultimo com ultimo.
+ *
+ * Emparelhar vizinhos, e nao "1o com 1o" ao pe da letra, e o que faz a conta
+ * fechar quando o numero de grupos e impar: o 1o que sobra vira dupla com o
+ * melhor dos 2os -- que e o vizinho dele na fila, e nao alguem de outro nivel.
+ *
+ * A restricao e nao repetir grupo: quem ja jogou junto a fase 1 inteira nao
+ * deve virar dupla agora. Quando os vizinhos sao do mesmo grupo, o proximo da
+ * fila entra no lugar.
+ */
+export function duplasDaFase2(colocacoes: Colocacao[]): Duo[] {
+  const fila = [...colocacoes].sort(
+    (a, b) => a.posicao - b.posicao || b.pontos - a.pontos || b.saldo - a.saldo,
+  )
+  const duos: Duo[] = []
+  const usados = new Set<string>()
+  for (let i = 0; i < fila.length; i++) {
+    const a = fila[i]
+    if (usados.has(a.id)) continue
+    let escolhido = -1
+    let reserva = -1
+    for (let k = i + 1; k < fila.length; k++) {
+      if (usados.has(fila[k].id)) continue
+      if (fila[k].grupo !== a.grupo) { escolhido = k; break }
+      if (reserva === -1) reserva = k
+    }
+    const j = escolhido >= 0 ? escolhido : reserva
+    if (j === -1) break // numero impar de jogadores: o ultimo fica de fora
+    usados.add(a.id)
+    usados.add(fila[j].id)
+    duos.push([a.id, fila[j].id])
+  }
+  return duos
+}
+
+/**
+ * As chaves da fase 2: as duplas, na ordem de forca, divididas em blocos.
+ *
+ * Cada chave joga so consigo mesma, entao o tamanho decide o tamanho da noite:
+ * 2 duplas viram uma final unica (1 jogo por pessoa), 4 viram um rodizio de 6
+ * partidas (3 jogos). Nunca menos de 2, senao a chave nao tem partida.
+ */
+export function chavesDaFase2(duos: Duo[], porChave: number): Duo[][] {
+  const alvo = Math.max(2, porChave)
+  const quantas = Math.max(1, Math.round(duos.length / alvo))
+  const base = Math.floor(duos.length / quantas)
+  const resto = duos.length % quantas
+  const out: Duo[][] = []
+  let i = 0
+  for (let c = 0; c < quantas; c++) {
+    const tam = base + (c < resto ? 1 : 0)
+    if (tam > 0) out.push(duos.slice(i, i + tam))
+    i += tam
+  }
+  return out.filter((c) => c.length >= 2)
+}
+
+/** Quantas partidas a fase 2 gera, dadas as chaves. */
+export function partidasDaFase2(chaves: Duo[][]): number {
+  return chaves.reduce((t, c) => t + (c.length * (c.length - 1)) / 2, 0)
+}
+
+/**
+ * As partidas da fase 2: dentro de cada chave, todas as duplas se enfrentam.
+ * `grupo` guarda o numero da CHAVE, para a tela poder agrupar como ja faz.
+ */
+export function partidasDasChaves(chaves: Duo[][]): PlannedMatch[] {
+  const out: PlannedMatch[] = []
+  chaves.forEach((chave, ci) => {
+    for (let i = 0; i < chave.length; i++) {
+      for (let j = i + 1; j < chave.length; j++) {
+        out.push({ team_a: chave[i], team_b: chave[j], grupo: ci, fase: 2 })
+      }
+    }
+  })
+  return ordenarFila(out)
 }
 
 export function formarGrupos(
@@ -664,6 +788,7 @@ export function planToMatches(sessionId: string, fila: PlannedMatch[]): Match[] 
     session_id: sessionId,
     round: i + 1, // posicao na fila (a coluna do banco se chama round)
     court: 0, // a quadra e definida quando a partida entra em quadra
+    fase: m.fase ?? 1,
     team_a: m.team_a,
     team_b: m.team_b,
     score_a: null,

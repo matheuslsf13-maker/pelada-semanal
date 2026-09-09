@@ -3,6 +3,12 @@ import ImportarLista from '../components/ImportarLista'
 import { Avatar, Empty, Modal, StatBox, Stepper, shareOrCopy } from '../components/ui'
 import {
   formarGrupos,
+  gruposEquilibrados,
+  duplasDaFase2,
+  chavesDaFase2,
+  partidasDasChaves,
+  partidasDaFase2,
+  type Colocacao,
   gerarFila,
   jogadoresDaPartida,
   ordemDeEspera,
@@ -240,6 +246,7 @@ function NewPlay({
   const [title, setTitle] = useState(preset.title ?? 'Pelada Semanal')
   const [courts, setCourts] = useState(preset.courts ?? 3)
   const [format, setFormat] = useState<PlayFormat>(preset.format ?? 'todos')
+  const [porChave, setPorChave] = useState(4)
   const [porGrupo, setPorGrupo] = useState(8)
   const [ranked, setRanked] = useState(preset.ranked ?? true)
   const [importando, setImportando] = useState(false)
@@ -255,13 +262,15 @@ function NewPlay({
 
   // no modo em grupos o app decide quantos grupos cabem: quem escolhe e o
   // tamanho, e a conta sai do numero de jogadores que confirmaram
-  const grupos = useMemo(
-    () =>
-      format === 'grupos' && selected.length >= 8
-        ? formarGrupos(selected, forca, porGrupo)
-        : [selected],
-    [format, selected, forca, porGrupo],
-  )
+  const emDuplas = format === 'grupos-duplas'
+  const grupos = useMemo(() => {
+    if (selected.length < 8) return [selected]
+    // no formato com fase 2 os grupos precisam ter a MESMA forca, senao ser 1o
+    // vale mais num grupo do que no outro e a dupla da fase 2 fica injusta
+    if (emDuplas) return gruposEquilibrados(selected, forca, porGrupo)
+    if (format === 'grupos') return formarGrupos(selected, forca, porGrupo)
+    return [selected]
+  }, [format, emDuplas, selected, forca, porGrupo])
   const tamanhos = grupos.map((g) => g.length)
 
   // as quadras saem dos GRUPOS, nao do total: cada partida precisa de quatro do
@@ -293,7 +302,7 @@ function NewPlay({
     }
     setBusy(true)
     try {
-      const emGrupos = format === 'grupos' && grupos.length > 1
+      const emGrupos = (format === 'grupos' || emDuplas) && grupos.length > 1
       const fila = gerarFila({
         playerIds: selected,
         ratings: forca,
@@ -310,8 +319,12 @@ function NewPlay({
         player_ids: selected,
         status: 'open',
         created_at: new Date().toISOString(),
-        format: emGrupos ? 'grupos' : 'todos',
+        format: emGrupos ? (emDuplas ? 'grupos-duplas' : 'grupos') : 'todos',
         groups: emGrupos ? grupos : null,
+        // a fase 2 so nasce quando a fase 1 termina: as duplas dependem da
+        // colocacao final de cada grupo
+        duos: null,
+        por_chave: emGrupos && emDuplas ? porChave : null,
         ranked,
       }
       await saveSession(session)
@@ -364,6 +377,9 @@ function NewPlay({
               <button className={format === 'todos' ? 'on' : ''} onClick={() => setFormat('todos')}>
                 🔁 Todos com todos
               </button>
+              <button className={emDuplas ? 'on' : ''} onClick={() => setFormat('grupos-duplas')}>
+                🤝 Grupos + duplas
+              </button>
               <button className={format === 'grupos' ? 'on' : ''} onClick={() => setFormat('grupos')}>
                 👥 Em grupos
               </button>
@@ -371,7 +387,9 @@ function NewPlay({
             <em className="hint">
               {format === 'todos'
                 ? 'cada jogador faz dupla com cada um dos outros exatamente uma vez'
-                : 'o mesmo rodízio, mas dentro de cada grupo — os grupos saem por nível, os pontos continuam individuais, e cada grupo tem o seu pódio'}
+                : emDuplas
+                  ? 'duas fases: primeiro todos com todos dentro do grupo, depois você ganha uma dupla fixa conforme sua colocação — 1º com 1º de outro grupo. Só a fase 2 vale pontos'
+                  : 'o mesmo rodízio, mas dentro de cada grupo — os grupos saem por nível, os pontos continuam individuais, e cada grupo tem o seu pódio'}
             </em>
           </div>
 
@@ -389,7 +407,7 @@ function NewPlay({
             </label>
           </div>
 
-          {format === 'grupos' && (
+          {(format === 'grupos' || emDuplas) && (
             <div className="toggle-card">
               <div className="field" style={{ marginBottom: 0 }}>
                 <span>Jogadores por grupo</span>
@@ -397,7 +415,11 @@ function NewPlay({
                 <em className="hint">
                   {selected.length < 8
                     ? 'com menos de 8 confirmados não dá para dividir: vai sair um grupo só'
-                    : `com ${selected.length} confirmados o app monta ${descreverGrupos(tamanhos)} — grupo 1 com quem está jogando melhor`}
+                    : `com ${selected.length} confirmados o app monta ${descreverGrupos(tamanhos)} — ${
+                        emDuplas
+                          ? 'todos com a mesma força média, para ser 1º valer o mesmo em qualquer grupo'
+                          : 'grupo 1 com quem está jogando melhor'
+                      }`}
                 </em>
                 {selected.length >= 8 && (
                   <>
@@ -526,7 +548,17 @@ function NewPlay({
             </div>
           )}
 
-          {format === 'grupos' && grupos.length > 1 && (
+          {emDuplas && grupos.length > 1 && (
+            <div className="toggle-card">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <span>Duplas por chave (fase 2)</span>
+                <Stepper value={porChave} min={2} max={6} onChange={setPorChave} />
+                <em className="hint">{descreverFase2(grupos, porChave)}</em>
+              </div>
+            </div>
+          )}
+
+          {(format === 'grupos' || emDuplas) && grupos.length > 1 && (
             <div className="stack" style={{ marginTop: 4 }}>
               {grupos.map((g, i) => (
                 <div key={i} className="grupo-box">
@@ -609,6 +641,23 @@ function descreverGrupos(tamanhos: number[]): string {
   return `${n} grupos: ${lista}`
 }
 
+/** "4 chaves de 2 duplas — 1 jogo por pessoa na fase 2". */
+function descreverFase2(grupos: string[][], porChave: number): string {
+  const gente = grupos.reduce((t, g) => t + g.length, 0)
+  const duplas = Math.floor(gente / 2)
+  const alvo = Math.max(2, porChave)
+  const quantas = Math.max(1, Math.round(duplas / alvo))
+  const base = Math.floor(duplas / quantas)
+  const partidas = quantas * ((base * (base - 1)) / 2)
+  const jogos = base - 1
+  if (base < 2) return 'Poucas duplas para formar chave — aumente o número de grupos.'
+  return (
+    `${duplas} duplas em ${quantas} chave(s) de ~${base} — ` +
+    `${Math.round(partidas)} partidas na fase 2, ${jogos} jogo(s) para cada um.` +
+    (jogos <= 1 ? ' Com chaves de 2 a fase 2 vira uma final única.' : '')
+  )
+}
+
 /** Quantas de cada grupo ficam de fora por vez — 0 quer dizer sem descanso. */
 function descreverFolga(tamanhos: number[]): string {
   const folgas = tamanhos.map((t) => t % 4)
@@ -674,15 +723,39 @@ function PlayDetail({
     [data.matches, session.id],
   )
 
-  const dayRows = useMemo(() => {
-    const ms = playedMatches(data, { sessionId: session.id })
-    return rankPlayers(computeStats(ms), nameOf)
-  }, [data, session.id, nameOf])
+  /** Neste formato o podio sai SO da fase 2; a fase 1 apenas define as duplas. */
+  const soFase2 = session.format === 'grupos-duplas'
 
-  /** Um podio por grupo quando o play e em grupos; um so quando nao e. */
+  const daFase1 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 1), [matches])
+  const daFase2 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 2), [matches])
+  /** A fase 1 acabou e a 2 ainda nao nasceu: e a hora de sortear as duplas. */
+  const podeGerarFase2 =
+    soFase2 && daFase2.length === 0 && daFase1.length > 0 && daFase1.every(isPlayed)
+
+  const dayRows = useMemo(() => {
+    const todas = playedMatches(data, { sessionId: session.id })
+    const ms = soFase2 ? todas.filter((m) => (m.fase ?? 1) === 2) : todas
+    return rankPlayers(computeStats(ms), nameOf)
+  }, [data, session.id, nameOf, soFase2])
+
+  /**
+   * Como o dia e dividido para o podio.
+   *
+   * No formato com fase 2 sao as CHAVES, nao os grupos: na fase 2 os grupos ja
+   * se misturaram, e comparar quem jogou na chave de cima com quem jogou na de
+   * baixo nao diz nada. Nos outros formatos continua sendo o grupo.
+   */
+  const divisaoDoPodio = useMemo(() => {
+    if (!soFase2 || !session.duos?.length) return session.groups
+    return chavesDaFase2(session.duos, session.por_chave ?? 4).map((chave) =>
+      chave.flatMap((d) => [d[0], d[1]]),
+    )
+  }, [soFase2, session.duos, session.por_chave, session.groups])
+
+  /** Um podio por grupo (ou por chave, na fase 2); um so quando nao ha divisao. */
   const podios = useMemo(
-    () => podiosDoDia(dayRows, session.groups),
-    [dayRows, session.groups],
+    () => podiosDoDia(dayRows, divisaoDoPodio),
+    [dayRows, divisaoDoPodio],
   )
 
   const doneCount = matches.filter(isPlayed).length
@@ -991,6 +1064,52 @@ function PlayDetail({
   }
 
   /** Troca as ocupados por quem esta livre, mantendo equilibrio e duplas novas. */
+  /**
+   * Sorteia a fase 2: a colocacao de cada um no seu grupo vira a dupla fixa.
+   *
+   * So roda com a fase 1 inteira lancada -- e a colocacao final que define
+   * quem joga com quem, entao gerar antes seria chutar.
+   */
+  async function gerarFase2() {
+    const gruposDoPlay = session.groups
+    if (!gruposDoPlay || gruposDoPlay.length < 2) {
+      onToast('Este play não tem grupos')
+      return
+    }
+    // classificacao dentro de cada grupo, so com as partidas da fase 1
+    const colocacoes: Colocacao[] = []
+    gruposDoPlay.forEach((g, gi) => {
+      const doGrupo = new Set(g)
+      const ms = daFase1.filter((m) => doGrupo.has(m.team_a[0]))
+      const rank = rankPlayers(computeStats(ms), nameOf).filter((r) => doGrupo.has(r.player_id))
+      rank.forEach((r, k) => {
+        colocacoes.push({
+          id: r.player_id,
+          grupo: gi,
+          posicao: k + 1,
+          pontos: r.points,
+          saldo: r.wins - r.losses,
+        })
+      })
+    })
+
+    const duos = duplasDaFase2(colocacoes)
+    const chaves = chavesDaFase2(duos, session.por_chave ?? 4)
+    if (partidasDaFase2(chaves) === 0) {
+      onToast('Não deu para formar chaves — poucas duplas')
+      return
+    }
+    const fila = partidasDasChaves(chaves)
+    const novas = planToMatches(session.id, fila).map((m, i) => ({
+      ...m,
+      // a fila da fase 2 entra depois da fase 1
+      round: daFase1.length + i + 1,
+    }))
+    await saveSession({ ...session, duos, rounds: daFase1.length + novas.length })
+    await saveMatches(novas)
+    onToast(`Fase 2 sorteada: ${duos.length} duplas 🤝`)
+  }
+
   function trocar(m: Match, sai: string, entra: string) {
     saveMatches([trocarNaPartida(m, sai, entra)])
   }
@@ -1027,6 +1146,11 @@ function PlayDetail({
             onToast(ok ? 'Partidas copiadas 💬' : 'Não consegui copiar')
           }}>💬 Enviar partidas</button>
           <button className="btn ghost sm" onClick={() => setShowRank(true)}>🏆 Ranking do dia</button>
+          {editable && podeGerarFase2 && (
+            <button className="btn marca sm" onClick={() => void gerarFase2()}>
+              🤝 Sortear a fase 2
+            </button>
+          )}
           {editable && (
             <>
               <button className="btn ghost sm" onClick={() => void regenerarPendentes()}>
@@ -1037,6 +1161,23 @@ function PlayDetail({
           )}
         </div>
       </div>
+
+      {soFase2 && daFase2.length === 0 && (
+        <div className="banner info">
+          🤝 <strong>Fase de grupos.</strong> Quando todas as partidas dos grupos tiverem placar,
+          toque em <strong>Sortear a fase 2</strong>: cada um ganha uma dupla fixa conforme a
+          colocação no grupo — 1º com 1º de outro grupo, 2º com 2º, e assim por diante.{' '}
+          <strong>Só a fase 2 vale pontos</strong> no pódio do dia.
+        </div>
+      )}
+
+      {soFase2 && daFase2.length > 0 && (
+        <div className="banner info">
+          🤝 <strong>Fase 2 em andamento.</strong> As duplas são fixas até o fim, e o pódio do dia
+          sai <strong>apenas destas partidas</strong> — a fase de grupos serviu para formar as
+          duplas.
+        </div>
+      )}
 
       {session.ranked === false && (
         <div className="banner info">
@@ -1205,7 +1346,7 @@ function PlayDetail({
                 podios.map((p) => (
                   <div key={p.grupo} style={{ marginBottom: 14 }}>
                     <div className="section-title" style={{ fontSize: 13 }}>
-                      🏆 Pódio do grupo {p.grupo}
+                      🏆 Pódio {soFase2 ? 'da chave' : 'do grupo'} {p.grupo}
                     </div>
                     <RankTable rows={p.rows} fire={streaksDoDia} />
                   </div>

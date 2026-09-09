@@ -704,6 +704,32 @@ sozinho, 4 conferidos na mão.
 
 ---
 
+## O formato `grupos-duplas`: por que os grupos mudam de regra
+
+Nos outros formatos os grupos saem **por nível** — o grupo 1 leva os melhores,
+para os jogos ficarem parelhos. Aqui isso **não serve**: se a fase 2 premia o 1º
+colocado com um bom parceiro, ser 1º tem que custar o mesmo em todo grupo. Num
+grupo forte o 1º valeria muito mais que o 1º de um grupo fraco.
+
+Por isso a fase 1 usa **serpentina**: com a lista ordenada por força, distribui
+1-2-3-4, depois 4-3-2-1, depois 1-2-3-4. Medido: a força média dos grupos fica
+com variação **0,00**.
+
+**As duplas da fase 2 não são "1º com 1º" ao pé da letra** — são *vizinhos numa
+fila ordenada por colocação*. Na prática dá o mesmo resultado quando fecha (todas
+as 8 duplas com a mesma colocação, no teste de 4 grupos), mas resolve o caso
+ímpar sem exceção na regra: com 5 grupos, o 1º que sobra vira dupla com o melhor
+dos 2º, que é o vizinho dele — e não com alguém de outro nível.
+
+A única restrição extra é **não repetir grupo**: quem jogou junto a fase 1
+inteira não vira dupla agora. Conferido: zero duplas do mesmo grupo em todos os
+cenários testados.
+
+⚠️ **O tamanho da chave decide o tamanho da noite.** Chave de 2 duplas vira uma
+final única — 1 jogo por pessoa na fase 2, e como só a fase 2 pontua, o dia
+inteiro se decide numa partida, com muito empate no ranking. Chave de 4 dá 6
+partidas e 3 jogos. O padrão é 4, e a tela mostra a conta antes de gerar.
+
 ## Pendências
 
 Este repositório é um **clone** do app do campeonato feminino, adaptado para o

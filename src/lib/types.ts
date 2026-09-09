@@ -24,7 +24,7 @@ export type SessionStatus = 'open' | 'finished'
  *  - 'grupos' : o mesmo rodizio, mas dentro de grupos formados por nivel.
  *               Os pontos continuam individuais e o ranking do dia e unico.
  */
-export type PlayFormat = 'todos' | 'grupos'
+export type PlayFormat = 'todos' | 'grupos' | 'grupos-duplas'
 
 /** Um "Pelada Semanal": um dia de jogos. */
 export type PlaySession = {
@@ -45,6 +45,13 @@ export type PlaySession = {
   format?: PlayFormat
   /** No modo em grupos, quem esta em cada grupo (o grupo 1 e o de nivel mais alto). */
   groups?: string[][] | null
+  /**
+   * No formato `grupos-duplas`, as duplas fixas da fase 2 ja formadas, na
+   * ordem de forca. Nulo enquanto a fase 1 nao terminou.
+   */
+  duos?: [string, string][] | null
+  /** Quantas duplas cabem em cada chave da fase 2. */
+  por_chave?: number | null
   /**
    * O play vale para o campeonato? `false` = play avulso: as partidas contam
    * no historico e no equilibrio das duplas, mas nao somam pontos no ranking
@@ -67,6 +74,11 @@ export type Match = {
   team_b: [string, string]
   score_a: number | null
   score_b: number | null
+  /**
+   * Em que fase do play a partida acontece. 1 = fase de grupos, 2 = fase das
+   * duplas fixas. So o formato `grupos-duplas` usa a 2; ausente conta como 1.
+   */
+  fase?: number
   /** Quando a partida entrou em quadra. Null = ainda nao comecou. */
   started_at?: string | null
   /** Quando o placar foi lancado. Alimenta o "quem esta fora ha mais tempo". */
