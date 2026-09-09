@@ -14,6 +14,15 @@ export type Player = {
   nickname?: string | null
   /** Outras grafias que a lista do grupo ja usou para esse jogador. */
   aliases?: string[]
+  /**
+   * Como ele paga: `mensalista`, `avulso` ou `convidado`.
+   * Ver `src/lib/mensalidade.ts` -- e la que mora a regra de quem pode entrar.
+   */
+  categoria?: string | null
+  /** Mensalista: ate que mes esta pago (AAAA-MM). */
+  pago_mes?: string | null
+  /** Avulso: credito de UMA participacao, gasto quando o play e finalizado. */
+  pago_avulso?: boolean | null
 }
 
 export type SessionStatus = 'open' | 'finished'

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { CATEGORIAS, type Categoria } from '../lib/mensalidade'
 import { conciliar, parseRoster, precisaConferir, type ItemDaLista } from '../lib/roster'
 import { useStore } from '../lib/store'
 import { uid, type Player } from '../lib/types'
@@ -39,6 +40,9 @@ export default function ImportarLista({
     setItens(conciliar(nomes, data.players))
   }
 
+  /** Categoria de quem a lista criar. Quem ja existe mantem a dele. */
+  const [categoriaNovos, setCategoriaNovos] = useState<Categoria>('convidado')
+
   function trocar(idx: number, valor: string) {
     setItens((atual) =>
       (atual ?? []).map((it, i) => (i === idx ? { ...it, vincularA: valor === 'nova' ? null : valor } : it)),
@@ -68,6 +72,9 @@ export default function ImportarLista({
           active: true,
           created_at: new Date().toISOString(),
           aliases: [],
+          categoria: categoriaNovos,
+          pago_mes: null,
+          pago_avulso: false,
         }
         savePlayer(nova)
         escolhidas.push(nova.id)
@@ -189,6 +196,31 @@ export default function ImportarLista({
             )
           })}
         </div>
+
+        {novas > 0 && (
+          <div className="card" style={{ marginTop: 14, marginBottom: 0 }}>
+            <div className="section-title" style={{ fontSize: 13 }}>
+              Como {novas === 1 ? 'o novo atleta paga' : 'os novos atletas pagam'}
+            </div>
+            <div className="chips-scroll">
+              {CATEGORIAS.map((c) => (
+                <button
+                  key={c.valor}
+                  className={`chip ${categoriaNovos === c.valor ? 'on' : 'off'}`}
+                  style={{ flex: 'none' }}
+                  onClick={() => setCategoriaNovos(c.valor)}
+                >
+                  {c.rotulo}
+                </button>
+              ))}
+            </div>
+            <p className="tiny muted" style={{ marginTop: 6, marginBottom: 0 }}>
+              {CATEGORIAS.find((c) => c.valor === categoriaNovos)?.explica}. Vale só para quem for
+              criado agora — quem já está cadastrado mantém a categoria dele. Dá para corrigir
+              depois em Jogadores.
+            </p>
+          </div>
+        )}
 
         <div className="row" style={{ gap: 8, marginTop: 14 }}>
           <button className="btn ghost grow" onClick={() => setItens(null)}>← Voltar</button>

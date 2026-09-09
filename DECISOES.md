@@ -730,6 +730,49 @@ final única — 1 jogo por pessoa na fase 2, e como só a fase 2 pontua, o dia
 inteiro se decide numa partida, com muito empate no ranking. Chave de 4 dá 6
 partidas e 3 jogos. O padrão é 4, e a tela mostra a conta antes de gerar.
 
+## Mensalidade: por que o vermelho aparece sozinho
+
+Cada atleta paga de um jeito — mensalista, avulso ou convidado — e o app precisa
+saber disso na hora de escalar o play. A pergunta de projeto era **onde mora a
+data de vencimento**.
+
+A saída óbvia seria gravar um `em_dia: boolean` e virar todo mundo para vermelho
+no dia 1º. Isso exige uma rotina que roda no servidor: dá para esquecer, dá para
+rodar duas vezes, e se o app ficar duas semanas sem abrir ninguém sabe em que
+estado ele está. Descartado.
+
+O que ficou é **derivado do calendário**: grava-se `pago_mes = '2026-09'`, e a
+pergunta "está em dia?" é `pago_mes === mês de hoje`. Na virada do mês a resposta
+muda sozinha, sem nada rodar. O mesmo raciocínio do "play avulso" e do fechamento
+do mês — estado que se calcula não desincroniza.
+
+O avulso segue a mesma ideia com outro relógio: `pago_avulso` é um **crédito de
+uma participação**, e quem gasta é o próprio fim do play (`consumirAvulsos`).
+Não é "pagou hoje", é "tem uma entrada na mão" — então adiantar o pagamento na
+terça e jogar na quinta funciona.
+
+**O convidado não é bloqueado, é observado.** A regra do grupo é que convidado é
+eventual, mas "eventual" é julgamento humano: o cara pode ter jogado duas semanas
+porque estava decidindo se entra. Travar seria o app decidindo por quem organiza.
+Dois plays seguidos acendem um alerta âmbar e param por aí.
+
+⚠️ **Trocar de categoria zera o pagamento.** Mensalista que vira avulso não herda
+o mês pago. Sem isso, mudar a categoria seria um jeito de ficar verde de graça.
+
+⚠️ **Bloquear não pode custar a lista montada.** O primeiro desenho só desabilitava
+o chip de quem estava devendo — e na prática o bloqueio quase nunca é
+inadimplência, é cadastro errado (o convidado que continuou marcado como
+mensalista). Sair da tela para arrumar em Jogadores e voltar apagaria a escalação
+em andamento. Por isso o toque abre o `ResolverCadastro`, que confirma o
+pagamento ou corrige a categoria ali e **já escala a pessoa**.
+
+⚠️ **Ao ligar isso, todo mundo que já existia ficou "mensalista devendo"** — é o
+padrão da coluna. Vale abrir Jogadores e acertar as categorias antes do primeiro
+play, senão a organização vai resolver 20 alertas com o pessoal esperando na
+quadra. Quem a **lista importada** cria nasce **convidado** de propósito (nome
+solto na lista do grupo raramente é mensalista), e quem é digitado um a um nasce
+**mensalista**, que é o caso comum de cadastro individual.
+
 ## Pendências
 
 Este repositório é um **clone** do app do campeonato feminino, adaptado para o

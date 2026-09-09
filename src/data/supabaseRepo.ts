@@ -37,8 +37,14 @@ export const supabaseRepo: Repo = {
     if (!error) return
     // banco ainda sem a coluna do apelido (script 07 nao rodou): salva o resto,
     // para nao travar o cadastro de quem ainda nao migrou
-    if (/nickname/.test(error.message ?? '')) {
-      const { nickname: _apelido, ...resto } = p
+    if (/nickname|categoria|pago_mes|pago_avulso/.test(error.message ?? '')) {
+      const {
+        nickname: _apelido,
+        categoria: _cat,
+        pago_mes: _mes,
+        pago_avulso: _avulso,
+        ...resto
+      } = p
       const retry = await client().from('players').upsert(resto)
       if (retry.error) throw retry.error
       return

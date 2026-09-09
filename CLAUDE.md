@@ -31,7 +31,7 @@ npx tsc --noEmit # só a checagem de tipos
 ```
 src/pages/       telas: Play.tsx (a maior), Ranking.tsx, Stats.tsx, Players.tsx
 src/lib/         regras: pairing (fila de partidas e grupos), scoring,
-                 streaks (status 🔥), stats,
+                 streaks (status 🔥), stats, mensalidade (quem pode entrar),
                  roster (importar lista), emQuadra (horários locais), store
 src/data/        armazenamento: localRepo (navegador) e supabaseRepo, com fila
                  de escrita otimista que sobrevive a refresh (queue.ts)
@@ -109,6 +109,25 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   mais** do que vencer quem está pior. Não é o ranking do mês (senão o primeiro
   play do mês sairia desequilibrado) e não é média de pontos, que não sabe de quem
   você ganhou — e por isso quebrava no modo em grupos.
+- **Quem paga define quem entra** (`src/lib/mensalidade.ts`). Três categorias, e
+  a organização escolhe a de cada atleta ao cadastrar, ao importar a lista ou no
+  "editar perfil":
+  - **📅 Mensalista** — liberado enquanto `players.pago_mes` for o mês de hoje.
+    A regra é **derivada do calendário**, não gravada: na virada do mês ele volta
+    a aparecer devendo **sozinho**, sem rotina para rodar, esquecer ou rodar duas
+    vezes.
+  - **🎟️ Avulso** — `players.pago_avulso` é um crédito de **uma** participação,
+    gasto por `consumirAvulsos()` quando o play é finalizado.
+  - **🤝 Convidado** — não paga e nunca é bloqueado. Dois plays seguidos só
+    acendem um **alerta âmbar** (`playsSeguidos`), porque quem decide se aquilo
+    virou mensalista é a organização, não o app.
+  - **Trocar de categoria zera o pagamento** — um mensalista que vira avulso não
+    herda o mês pago, senão ficaria verde sem ter pago.
+  - Na hora de escolher quem joga, tocar em quem está devendo **não bloqueia e
+    pronto**: abre o `ResolverCadastro`, que confirma o pagamento ou corrige a
+    categoria ali mesmo e já escala. Quase todo bloqueio é cadastro errado, não
+    inadimplência — e mandar a pessoa até Jogadores perderia a lista montada.
+    O botão "Todos" também respeita o portão.
 - **Play avulso** (`sessions.ranked = false`): conta no histórico e na força,
   mas **não soma no ranking do mês nem mexe nas sequências**. Serve para o jogo
   fora de calendário que não é o campeonato.

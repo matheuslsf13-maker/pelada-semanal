@@ -2,6 +2,14 @@ import { useMemo, useRef, useState } from 'react'
 import { Avatar, Empty, Modal } from '../components/ui'
 import { squareThumb } from '../lib/image'
 import { playedMatches } from '../lib/stats'
+import {
+  CATEGORIAS,
+  categoriaDe,
+  confirmarPagamento,
+  desfazerPagamento,
+  situacaoDoAtleta,
+  type Categoria,
+} from '../lib/mensalidade'
 import { useStore } from '../lib/store'
 import { jogadoresDaPartida } from '../lib/pairing'
 import { uid, type Player } from '../lib/types'
@@ -9,6 +17,8 @@ import { uid, type Player } from '../lib/types'
 export default function Players({ onToast }: { onToast: (m: string) => void }) {
   const { data, savePlayer, deletePlayer, mergePlayers, canEdit, repo } = useStore()
   const [name, setName] = useState('')
+  /** Categoria de quem for cadastrado agora; fica escolhida para o proximo. */
+  const [novaCategoria, setNovaCategoria] = useState<Categoria>('mensalista')
   const [busy, setBusy] = useState<string | null>(null)
   const [juntando, setJuntando] = useState<Player | null>(null)
   const [editando, setEditando] = useState<Player | null>(null)
@@ -27,6 +37,9 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
       photo_url: null,
       active: true,
       created_at: new Date().toISOString(),
+      categoria: novaCategoria,
+      pago_mes: null,
+      pago_avulso: false,
     }
     await savePlayer(p)
     setName('')
@@ -83,6 +96,21 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
             />
             <button className="btn marca" onClick={() => void add()} disabled={!name.trim()}>Add</button>
           </div>
+          <div className="chips-scroll" style={{ marginTop: 8 }}>
+            {CATEGORIAS.map((c) => (
+              <button
+                key={c.valor}
+                className={`chip ${novaCategoria === c.valor ? 'on' : 'off'}`}
+                style={{ flex: 'none' }}
+                onClick={() => setNovaCategoria(c.valor)}
+              >
+                {c.rotulo}
+              </button>
+            ))}
+          </div>
+          <p className="tiny muted" style={{ marginTop: 6, marginBottom: 0 }}>
+            {CATEGORIAS.find((c) => c.valor === novaCategoria)?.explica}
+          </p>
         </div>
       )}
 
@@ -140,12 +168,13 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
                   {p.nickname?.trim() && p.nickname.trim() !== p.name && (
                     <div className="tiny muted ellipsis">{p.name}</div>
                   )}
+                  <SinalDePagamento jogador={p} />
                   <div className="tiny muted">
                     {busy === p.id ? (
                       'salvando foto…'
                     ) : (
                       <>
-                        {p.active ? 'ativa' : 'inativa'}
+                        {p.active ? 'ativo' : 'inativo'}
                         {canEdit && (
                           <>
                             {' · '}
@@ -287,6 +316,7 @@ function EditarPerfil({
   const { data } = useStore()
   const [nome, setNome] = useState(jogador.name)
   const [apelido, setApelido] = useState(jogador.nickname ?? '')
+  const [categoria, setCategoria] = useState<Categoria>(categoriaDe(jogador))
   const [apelidos, setApelidos] = useState((jogador.aliases ?? []).join('\n'))
 
   const historico = useMemo(() => {
@@ -305,11 +335,17 @@ function EditarPerfil({
       .split('\n')
       .map((x) => x.trim())
       .filter(Boolean)
+    // trocar de categoria zera o pagamento: um mensalista que virou avulso nao
+    // herda o mes pago, e vice-versa -- senao alguem ficaria verde sem ter pago
+    const mudou = categoria !== categoriaDe(jogador)
     onSalvar({
       ...jogador,
       name: limpo,
       nickname: apelido.trim() || null,
       aliases: [...new Set(lista)],
+      categoria,
+      pago_mes: mudou ? null : jogador.pago_mes,
+      pago_avulso: mudou ? false : jogador.pago_avulso,
     })
   }
 
@@ -342,6 +378,26 @@ function EditarPerfil({
           feche aqui e use o <strong>🔗</strong> para juntar as duas.
         </div>
       )}
+
+      <div className="field" style={{ marginTop: 12 }}>
+        <span>Como ele paga</span>
+        <div className="chips-scroll">
+          {CATEGORIAS.map((c) => (
+            <button
+              key={c.valor}
+              className={`chip ${categoria === c.valor ? 'on' : 'off'}`}
+              style={{ flex: 'none' }}
+              onClick={() => setCategoria(c.valor)}
+            >
+              {c.rotulo}
+            </button>
+          ))}
+        </div>
+        <em className="hint" style={{ marginTop: 6 }}>
+          {CATEGORIAS.find((c) => c.valor === categoria)?.explica}
+          {categoria !== categoriaDe(jogador) && ' — trocar de categoria zera o pagamento atual.'}
+        </em>
+      </div>
 
       <label className="field" style={{ marginTop: 12 }}>
         <span>Outras grafias do nome (uma por linha)</span>
@@ -378,5 +434,48 @@ function EditarPerfil({
         Cancelar
       </button>
     </Modal>
+  )
+}
+
+
+/**
+ * O semaforo do pagamento, na linha do atleta.
+ *
+ * Verde nao quer dizer "pagou alguma vez": quer dizer "pode entrar no proximo
+ * play". Por isso o mensalista fica vermelho sozinho na virada do mes e o
+ * avulso volta ao vermelho depois de jogar -- a regra e derivada, ninguem
+ * precisa lembrar de zerar nada.
+ */
+function SinalDePagamento({ jogador }: { jogador: Player }) {
+  const { data, savePlayer, canEdit } = useStore()
+  const categoria = categoriaDe(jogador)
+  const sit = situacaoDoAtleta(jogador, data)
+  const cor =
+    sit.cor === 'ok' ? 'var(--verde)' : sit.cor === 'atencao' ? 'var(--ouro)' : 'var(--danger)'
+
+  return (
+    <div className="tiny" style={{ marginTop: 2 }}>
+      <span className="nowrap" style={{ color: cor, fontWeight: 800 }}>
+        ● {sit.rotulo}
+      </span>
+      {canEdit && categoria !== 'convidado' && (
+        <>
+          {' · '}
+          <button
+            className="linkish"
+            onClick={() =>
+              void savePlayer(
+                sit.liberado ? desfazerPagamento(jogador) : confirmarPagamento(jogador),
+              )
+            }
+          >
+            {sit.liberado ? 'desfazer' : 'confirmar pagamento'}
+          </button>
+        </>
+      )}
+      {sit.alerta && (
+        <div className="tiny" style={{ color: 'var(--ouro)', marginTop: 2 }}>⚠️ {sit.alerta}</div>
+      )}
+    </div>
   )
 }
