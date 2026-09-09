@@ -710,14 +710,14 @@ Este repositório é um **clone** do app do campeonato feminino, adaptado para o
 grupo masculino. O que veio antes dele está registrado acima porque as decisões
 de algoritmo continuam valendo — o que muda é identidade, não regra.
 
-- [ ] **Criar o projeto Supabase deste campeonato** e preencher
-      `src/config.ts`. Enquanto estiver vazio o app roda em **modo local**
-      (dados só no navegador de quem abriu). ⚠️ Não aponte para o banco do
-      outro campeonato: os dois passariam a dividir jogadores e ranking.
-- [ ] **Rodar as migrações** `supabase/*.sql` na ordem numérica, no SQL Editor
-      do projeto novo.
+- [x] ~~Criar o projeto Supabase deste campeonato~~ — `hmbankpjvkmlcyzwgtbl`,
+      separado do campeonato feminino. Ligado em `src/config.ts`.
+- [x] ~~Rodar as migrações~~ — feito em 08/09/2026. As 5 tabelas existem com
+      RLS ligado; conferido pela API: leitura pública responde 200 e escrita
+      sem login é negada com 401.
 - [ ] **Criar o login do organizador** em Authentication → Users (e-mail e
-      senha, com *Auto Confirm User* marcado).
+      senha, com *Auto Confirm User* marcado). Sem isso ninguém consegue
+      lançar placar — o app abre só em modo leitura.
 - [ ] **Identidade visual.** A paleta atual é provisória e neutra — azul do mar,
       verde e areia. Os tokens estão num bloco só, no topo de `src/styles.css`,
       com nomes de papel (`--marca`, `--apoio`, `--ouro`…), então trocar as

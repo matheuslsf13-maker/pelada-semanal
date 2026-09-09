@@ -1,13 +1,17 @@
 /**
  * Dados do projeto Supabase.
  *
- * EM BRANCO DE PROPOSITO. Enquanto estiver assim o app roda em MODO LOCAL: tudo
- * fica guardado no navegador de quem abriu, e nada e compartilhado. Da para usar
- * assim para testar sem depender de nada.
+ * Este e o projeto PROPRIO da Pelada Semanal (`hmbankpjvkmlcyzwgtbl`), separado
+ * do campeonato feminino de proposito.
  *
- * Para o grupo inteiro enxergar o mesmo ranking, crie um projeto Supabase
- * PROPRIO deste campeonato e preencha abaixo. Nao aponte para o banco de outro
- * campeonato: os dois passariam a dividir jogadores, partidas e ranking.
+ * Compartilhar um banco entre dois campeonatos parece inofensivo -- "sao pessoas
+ * diferentes" -- mas o app nao sabe o que e campeonato: ele assume um banco =
+ * um campeonato. Juntar os dois misturaria o ranking do mes, a lista de
+ * jogadores e a lista de plays, e cada play de um zeraria as sequencias 🔥 do
+ * outro, porque quem nao sobe ao podio perde o status.
+ *
+ * Deixando as duas constantes em branco, o app volta para o MODO LOCAL: tudo
+ * guardado so no navegador de quem abriu.
  *
  * Onde achar: painel do Supabase -> Project Settings -> API
  *   SUPABASE_URL      = "Project URL"        (https://xxxx.supabase.co)
@@ -24,5 +28,5 @@
  * As variaveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY tem
  * prioridade sobre estes valores.
  */
-export const SUPABASE_URL = ''
-export const SUPABASE_ANON_KEY = ''
+export const SUPABASE_URL = 'https://hmbankpjvkmlcyzwgtbl.supabase.co'
+export const SUPABASE_ANON_KEY = 'sb_publishable_A2E5WE7OP_y_Iir_Tm6_yA_8Izx5uhL'

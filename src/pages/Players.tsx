@@ -320,7 +320,7 @@ function EditarPerfil({
         <input className="input" value={nome} autoFocus onChange={(e) => setNome(e.target.value)} />
       </label>
       <p className="tiny muted" style={{ marginTop: 6 }}>
-        O nome completo, para conferir a lista sem confundir duas Anas. Só aparece aqui.
+        O nome completo, para conferir a lista sem confundir dois Joões. Só aparece aqui.
       </p>
 
       <label className="field" style={{ marginTop: 12 }}>
@@ -349,13 +349,13 @@ function EditarPerfil({
           className="input"
           rows={3}
           value={apelidos}
-          placeholder={'Ana\nAninha\nAna Cristina'}
+          placeholder={'João\nJoãozinho\nJoão Pedro'}
           onChange={(e) => setApelidos(e.target.value)}
         />
       </label>
       <p className="tiny muted" style={{ marginTop: 6 }}>
         É por aqui que a importação da lista do grupo acerta a pessoa. Se ela aparece na lista às
-        vezes como <em>Ana</em> e às vezes como <em>Aninha</em>, escreva as duas — assim o app não
+        vezes como <em>João</em> e às vezes como <em>Joãozinho</em>, escreva os dois — assim o app não
         cadastra uma segunda.
       </p>
 
