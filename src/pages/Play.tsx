@@ -349,6 +349,53 @@ function NewPlay({
           <div className="section-title" style={{ margin: 0 }}>🎾 Novo Play</div>
           <button className="btn ghost sm" onClick={onCancel}>Cancelar</button>
         </div>
+        <div className="row spread" style={{ marginTop: 12 }}>
+          <div className="section-title" style={{ margin: 0 }}>👥 Quem vai jogar ({selected.length})</div>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn ghost sm" onClick={() => setSelected(available.map((p) => p.id))}>Todos</button>
+            <button className="btn ghost sm" onClick={() => setSelected([])}>Limpar</button>
+          </div>
+        </div>
+        <button className="btn apoio block sm" style={{ marginTop: 10 }} onClick={() => setImportando(true)}>
+          📋 Colar lista de confirmação do grupo
+        </button>
+
+        {available.length === 0 ? (
+          <Empty icon="👥">
+            Cadastre os jogadores na aba <strong>Jogadores</strong> — ou cole a lista do grupo no botão acima.
+          </Empty>
+        ) : (
+          <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
+            {available.map((p) => {
+              const on = selected.includes(p.id)
+              return (
+                <button key={p.id} className={`chip ${on ? 'on' : 'off'}`} onClick={() => toggle(p.id)}>
+                  <Avatar player={playerById(p.id)} size={22} />
+                  {p.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {selected.length >= 4 && (
+          <div className="banner info" style={{ marginTop: 14, marginBottom: 0 }}>
+            Com <strong>{selected.length} jogadores</strong> dá para usar <strong>{effCourts} quadra(s)</strong> ao mesmo tempo
+            {restPorVez > 0
+              ? ` (${restPorVez} esperam a vez${grupos.length > 1 ? ', revezando dentro do próprio grupo' : ''}, e entra sempre quem está fora há mais tempo)`
+              : ' (todos jogam ao mesmo tempo)'}.
+            {effCourts < courts && ' Ajustei o número de quadras para caber todo mundo.'}
+            <br />
+            Para equilibrar as duplas e dividir os grupos, o app não usa o ranking do mês:
+            usa uma nota própria em que <strong>vencer quem está jogando melhor vale mais</strong>{' '}
+            do que vencer quem está jogando pior. Ela se atualiza a cada partida, então quem
+            está em alta sobe de grupo sozinho — e a virada do mês não desequilibra nada.
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="section-title">⚙️ Como vai ser o play</div>
         <div className="stack" style={{ marginTop: 12 }}>
           <label className="field">
             <span>Nome do play</span>
@@ -394,7 +441,7 @@ function NewPlay({
               {format === 'todos'
                 ? 'cada jogador faz dupla com cada um dos outros exatamente uma vez'
                 : emDuplas
-                  ? 'duas fases: primeiro todos com todos dentro do grupo, depois você ganha uma dupla fixa conforme sua colocação — 1º com 1º de outro grupo. Só a fase 2 vale pontos'
+                  ? 'duas fases: primeiro todos com todos dentro do grupo, depois você ganha uma dupla fixa conforme sua colocação — 1º com 1º de outro grupo — e começa o mata-mata. O pódio sai só no fim, do mata-mata inteiro'
                   : 'o mesmo rodízio, mas dentro de cada grupo — os grupos saem por nível, os pontos continuam individuais, e cada grupo tem o seu pódio'}
             </em>
           </div>
@@ -429,11 +476,15 @@ function NewPlay({
                 </em>
                 {selected.length >= 8 && (
                   <>
-                    <em className="hint" style={{ marginTop: 4 }}>
-                      🔥 Cada grupo tem o seu pódio, e quem sobe segura a sequência:{' '}
-                      <strong>{descreverPodios(tamanhos)}</strong>. Grupos menores deixam o status
-                      fácil demais.
-                    </em>
+                    {/* podio por grupo nao existe no grupos+duplas: la o podio
+                        e um so, no fim do mata-mata */}
+                    {!emDuplas && (
+                      <em className="hint" style={{ marginTop: 4 }}>
+                        🔥 Cada grupo tem o seu pódio, e quem sobe segura a sequência:{' '}
+                        <strong>{descreverPodios(tamanhos)}</strong>. Grupos menores deixam o status
+                        fácil demais.
+                      </em>
+                    )}
                     <em className="hint" style={{ marginTop: 4 }}>
                       🪑 {descreverFolga(tamanhos)}
                     </em>
@@ -597,51 +648,6 @@ function NewPlay({
         </div>
       </div>
 
-      <div className="card">
-        <div className="row spread">
-          <div className="section-title" style={{ margin: 0 }}>👥 Quem vai jogar ({selected.length})</div>
-          <div className="row" style={{ gap: 6 }}>
-            <button className="btn ghost sm" onClick={() => setSelected(available.map((p) => p.id))}>Todos</button>
-            <button className="btn ghost sm" onClick={() => setSelected([])}>Limpar</button>
-          </div>
-        </div>
-        <button className="btn apoio block sm" style={{ marginTop: 10 }} onClick={() => setImportando(true)}>
-          📋 Colar lista de confirmação do grupo
-        </button>
-
-        {available.length === 0 ? (
-          <Empty icon="👥">
-            Cadastre os jogadores na aba <strong>Jogadores</strong> — ou cole a lista do grupo no botão acima.
-          </Empty>
-        ) : (
-          <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
-            {available.map((p) => {
-              const on = selected.includes(p.id)
-              return (
-                <button key={p.id} className={`chip ${on ? 'on' : 'off'}`} onClick={() => toggle(p.id)}>
-                  <Avatar player={playerById(p.id)} size={22} />
-                  {p.name}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {selected.length >= 4 && (
-          <div className="banner info" style={{ marginTop: 14, marginBottom: 0 }}>
-            Com <strong>{selected.length} jogadores</strong> dá para usar <strong>{effCourts} quadra(s)</strong> ao mesmo tempo
-            {restPorVez > 0
-              ? ` (${restPorVez} esperam a vez${grupos.length > 1 ? ', revezando dentro do próprio grupo' : ''}, e entra sempre quem está fora há mais tempo)`
-              : ' (todos jogam ao mesmo tempo)'}.
-            {effCourts < courts && ' Ajustei o número de quadras para caber todo mundo.'}
-            <br />
-            Para equilibrar as duplas e dividir os grupos, o app não usa o ranking do mês:
-            usa uma nota própria em que <strong>vencer quem está jogando melhor vale mais</strong>{' '}
-            do que vencer quem está jogando pior. Ela se atualiza a cada partida, então quem
-            está em alta sobe de grupo sozinho — e a virada do mês não desequilibra nada.
-          </div>
-        )}
-      </div>
 
       {importando && (
         <ImportarLista
@@ -1506,7 +1512,7 @@ function PlayDetail({
                 podios.map((p) => (
                   <div key={p.grupo} style={{ marginBottom: 14 }}>
                     <div className="section-title" style={{ fontSize: 13 }}>
-                      🏆 Pódio {soFase2 ? 'da chave' : 'do grupo'} {p.grupo}
+                      🏆 Pódio do grupo {p.grupo}
                     </div>
                     <RankTable rows={p.rows} fire={streaksDoDia} />
                   </div>
