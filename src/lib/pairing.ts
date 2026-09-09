@@ -138,10 +138,13 @@ export type Colocacao = {
  * deve virar dupla agora. Quando os vizinhos sao do mesmo grupo, o proximo da
  * fila entra no lugar.
  */
-export function duplasDaFase2(colocacoes: Colocacao[]): Duo[] {
-  const fila = [...colocacoes].sort(
+export function duplasDaFase2(colocacoes: Colocacao[], maxDuplas?: number): Duo[] {
+  const ordenados = [...colocacoes].sort(
     (a, b) => a.posicao - b.posicao || b.pontos - a.pontos || b.saldo - a.saldo,
   )
+  // sobrando gente para o tamanho do mata-mata, os ultimos da fila ficam de
+  // fora: com 20 atletas e alvo de 8 duplas, saem 4 e ficam 16 para as quartas
+  const fila = maxDuplas ? ordenados.slice(0, maxDuplas * 2) : ordenados
   const duos: Duo[] = []
   const usados = new Set<string>()
   for (let i = 0; i < fila.length; i++) {

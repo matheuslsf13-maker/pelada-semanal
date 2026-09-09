@@ -71,6 +71,10 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Sortear a
     fase 2"), porque depende da colocação final.
   - **Só a fase 2 vale pontos** no pódio do dia, e o pódio é **por chave**.
+  - **O mata-mata tem tamanho alvo em duplas** (`sessions.duplas_mm`, padrão 8 =
+    16 atletas = quartas). Sobrando gente, os **piores colocados da fase de
+    grupos ficam de fora**: com 20 atletas saem 4 e ficam 16. Faltando, todos
+    entram e os melhores passam de bye (12 atletas = 6 duplas, 2 byes).
   - *Fase 2 em diante*: **mata-mata**. As duplas se cruzam pelas pontas (a
     melhor pega a pior) e quem perde sai. As melhores passam de **bye** quando o
     total não é potência de 2 — com 12 atletas, as duas primeiras duplas vão

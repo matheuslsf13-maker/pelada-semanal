@@ -50,8 +50,12 @@ export type PlaySession = {
    * ordem de forca. Nulo enquanto a fase 1 nao terminou.
    */
   duos?: [string, string][] | null
-  /** Quantas duplas cabem em cada chave da fase 2. */
-  por_chave?: number | null
+  /**
+   * Quantas duplas entram no mata-mata. Padrao 8 (= 16 atletas, quartas de
+   * final). Com mais gente, os piores colocados na fase de grupos ficam de
+   * fora; com menos, todos entram e os melhores passam de bye.
+   */
+  duplas_mm?: number | null
   /**
    * No formato `grupos-duplas`, quantos pontos fecham a partida em cada fase:
    * [grupos, duplas fixas, semifinal, final]. Ausente = usa `target` em todas.

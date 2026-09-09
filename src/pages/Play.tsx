@@ -248,7 +248,8 @@ function NewPlay({
   const [title, setTitle] = useState(preset.title ?? 'Pelada Semanal')
   const [courts, setCourts] = useState(preset.courts ?? 3)
   const [format, setFormat] = useState<PlayFormat>(preset.format ?? 'todos')
-  const [porChave, setPorChave] = useState(4)
+  /** Quantas duplas entram no mata-mata: 8 = 16 atletas, quartas de final. */
+  const [duplasMM, setDuplasMM] = useState(8)
   /** Pontos que fecham a partida em cada fase: grupos, duplas, semi, final. */
   const [alvos, setAlvos] = useState<number[]>([4, 4, 4, 4])
   const [porGrupo, setPorGrupo] = useState(8)
@@ -328,7 +329,7 @@ function NewPlay({
         // a fase 2 so nasce quando a fase 1 termina: as duplas dependem da
         // colocacao final de cada grupo
         duos: null,
-        por_chave: emGrupos && emDuplas ? porChave : null,
+        duplas_mm: emGrupos && emDuplas ? duplasMM : null,
         alvos: emGrupos && emDuplas ? alvos : null,
         ranked,
       }
@@ -576,9 +577,9 @@ function NewPlay({
               </div>
 
               <div className="field" style={{ marginBottom: 0 }}>
-                <span>Duplas por chave (fase 2)</span>
-                <Stepper value={porChave} min={2} max={6} onChange={setPorChave} />
-                <em className="hint">{descreverFase2(grupos, porChave)}</em>
+                <span>Duplas no mata-mata</span>
+                <Stepper value={duplasMM} min={2} max={16} onChange={setDuplasMM} />
+                <em className="hint">{descreverFase2(grupos, duplasMM)}</em>
               </div>
             </div>
           )}
@@ -708,20 +709,30 @@ function desempatarNoConfronto(rank: PlayerStat[], ms: Match[]): PlayerStat[] {
   return out
 }
 
-/** "4 chaves de 2 duplas — 1 jogo por pessoa na fase 2". */
-function descreverFase2(grupos: string[][], porChave: number): string {
+/** "16 atletas viram 8 duplas — quartas de final, 7 jogos". */
+function descreverFase2(grupos: string[][], duplasMM: number): string {
   const gente = grupos.reduce((t, g) => t + g.length, 0)
-  const duplas = Math.floor(gente / 2)
-  const alvo = Math.max(2, porChave)
-  const quantas = Math.max(1, Math.round(duplas / alvo))
-  const base = Math.floor(duplas / quantas)
-  const partidas = quantas * ((base * (base - 1)) / 2)
-  const jogos = base - 1
-  if (base < 2) return 'Poucas duplas para formar chave — aumente o número de grupos.'
+  const possiveis = Math.floor(gente / 2)
+  const duplas = Math.min(possiveis, Math.max(2, duplasMM))
+  const foraDoMataMata = gente - duplas * 2
+  if (duplas < 2) return 'Poucos atletas para o mata-mata.'
+
+  // com o total fora da potencia de 2, as melhores passam de bye
+  let cabe = 1
+  while (cabe < duplas) cabe *= 2
+  const byes = cabe - duplas
+  const nome =
+    cabe === 2 ? 'a final' : cabe === 4 ? 'a semifinal' : cabe === 8 ? 'as quartas' : `${cabe} duplas`
+  const jogos = duplas - 1 // mata-mata: cada jogo elimina uma dupla
+
   return (
-    `${duplas} duplas em ${quantas} chave(s) de ~${base} — ` +
-    `${Math.round(partidas)} partidas na fase 2, ${jogos} jogo(s) para cada um.` +
-    (jogos <= 1 ? ' Com chaves de 2 a fase 2 vira uma final única.' : '')
+    `${duplas} duplas no mata-mata` +
+    (foraDoMataMata > 0
+      ? ` — os ${foraDoMataMata} piores da fase de grupos ficam de fora.`
+      : ' — todo mundo entra.') +
+    ` Começa em ${nome}` +
+    (byes > 0 ? `, com ${byes} dupla(s) passando de bye.` : '.') +
+    ` São ${jogos} jogos até a campeã.`
   )
 }
 
@@ -1203,7 +1214,7 @@ function PlayDetail({
       })
     })
 
-    const duos = duplasDaFase2(colocacoes)
+    const duos = duplasDaFase2(colocacoes, session.duplas_mm ?? 8)
     if (duos.length < 2) {
       onToast('Poucas duplas para o mata-mata')
       return

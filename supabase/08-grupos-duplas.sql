@@ -46,3 +46,14 @@ comment on column public.sessions.alvos is
 
 comment on column public.matches.fase is
   '1 = grupos, 2 = duplas fixas, 3 = semifinal, 4 = final';
+
+-- ------------------------------------------------------------
+--  Quantas duplas entram no mata-mata. Padrão 8 (= 16 atletas, quartas).
+--  Sobrando gente, os piores colocados da fase de grupos ficam de fora;
+--  faltando, todos entram e os melhores passam de bye.
+-- ------------------------------------------------------------
+alter table public.sessions
+  add column if not exists duplas_mm int;
+
+comment on column public.sessions.duplas_mm is
+  'grupos-duplas: quantas duplas entram no mata-mata (padrao 8 = 16 atletas)';
