@@ -43,6 +43,19 @@
   --verde-suave:  rgba(22, 121, 79, 0.12);
   --danger-suave: rgba(192, 57, 43, 0.11);
 
+  /* ---- uma cor por grupo ----
+     Nao saem da marca de proposito: precisam ser distinguiveis ENTRE SI a
+     distancia, na beira da quadra, e nao harmonicas. Oito porque o app aceita
+     ate 8 grupos (32 atletas em grupos de 4); da a nona a roda repete. ---- */
+  --g1: #0d7c8a;
+  --g2: #b8477a;
+  --g3: #16794f;
+  --g4: #b05f2a;
+  --g5: #3f5a8a;
+  --g6: #7a4fb0;
+  --g7: #a8860b;
+  --g8: #1f6f9e;
+
   /* ---- as duas que nao mudam de tema ---- */
   --sempre-claro:  #f2f7f9;
   --sempre-escuro: #0f1c23;
@@ -79,6 +92,16 @@
   --bronze-suave: rgba(251, 146, 60, 0.14);
   --verde-suave:  rgba(52, 211, 153, 0.14);
   --danger-suave: rgba(248, 113, 113, 0.15);
+
+  /* mesmas familias, com brilho para nao apagar no fundo escuro */
+  --g1: #2dd4bf;
+  --g2: #f472b6;
+  --g3: #34d399;
+  --g4: #fb923c;
+  --g5: #7dd3fc;
+  --g6: #c084fc;
+  --g7: #fbbf24;
+  --g8: #60a5fa;
 
   --shadow: 0 10px 28px rgba(0, 0, 0, 0.40);
   color-scheme: dark;
@@ -852,15 +875,30 @@ textarea.input { line-height: 1.45; }
   color: var(--sempre-escuro);
   vertical-align: middle;
 }
-.grupo-tag.g1 { background: var(--marca); }
-.grupo-tag.g2 { background: var(--apoio); }
-.grupo-tag.g3 { background: var(--verde); }
-.grupo-tag.g4 { background: var(--bronze); }
+.grupo-tag.g1 { background: var(--g1); }
+.grupo-tag.g2 { background: var(--g2); }
+.grupo-tag.g3 { background: var(--g3); }
+.grupo-tag.g4 { background: var(--g4); }
+.grupo-tag.g5 { background: var(--g5); }
+.grupo-tag.g6 { background: var(--g6); }
+.grupo-tag.g7 { background: var(--g7); }
+.grupo-tag.g8 { background: var(--g8); }
 .repetida-tag { margin-left: 6px; }
+
+/* a partida herda a cor do grupo dela: na quadra da para achar de longe */
+.match.g1, .fila-linha.g1 { border-left: 4px solid var(--g1); }
+.match.g2, .fila-linha.g2 { border-left: 4px solid var(--g2); }
+.match.g3, .fila-linha.g3 { border-left: 4px solid var(--g3); }
+.match.g4, .fila-linha.g4 { border-left: 4px solid var(--g4); }
+.match.g5, .fila-linha.g5 { border-left: 4px solid var(--g5); }
+.match.g6, .fila-linha.g6 { border-left: 4px solid var(--g6); }
+.match.g7, .fila-linha.g7 { border-left: 4px solid var(--g7); }
+.match.g8, .fila-linha.g8 { border-left: 4px solid var(--g8); }
+.fila-linha[class*=' g'] { padding-left: 8px; }
 
 .grupo-box {
   border: 1px solid var(--line);
-  border-left: 4px solid var(--marca);
+  border-left: 4px solid var(--g1);
   border-radius: 12px;
   padding: 8px 10px;
   background: var(--card-2);
@@ -870,11 +908,25 @@ textarea.input { line-height: 1.45; }
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .5px;
-  color: var(--marca);
+  color: var(--g1);
   margin-bottom: 2px;
 }
-.grupo-box + .grupo-box .grupo-nome { color: var(--apoio); }
-.grupo-box + .grupo-box { border-left-color: var(--apoio); }
+.grupo-box.g1 { border-left-color: var(--g1); }
+.grupo-box.g2 { border-left-color: var(--g2); }
+.grupo-box.g3 { border-left-color: var(--g3); }
+.grupo-box.g4 { border-left-color: var(--g4); }
+.grupo-box.g5 { border-left-color: var(--g5); }
+.grupo-box.g6 { border-left-color: var(--g6); }
+.grupo-box.g7 { border-left-color: var(--g7); }
+.grupo-box.g8 { border-left-color: var(--g8); }
+.grupo-box.g1 .grupo-nome { color: var(--g1); }
+.grupo-box.g2 .grupo-nome { color: var(--g2); }
+.grupo-box.g3 .grupo-nome { color: var(--g3); }
+.grupo-box.g4 .grupo-nome { color: var(--g4); }
+.grupo-box.g5 .grupo-nome { color: var(--g5); }
+.grupo-box.g6 .grupo-nome { color: var(--g6); }
+.grupo-box.g7 .grupo-nome { color: var(--g7); }
+.grupo-box.g8 .grupo-nome { color: var(--g8); }
 
 /* linha compacta da fila e das partidas ja jogadas */
 .fila-linha {

@@ -47,8 +47,21 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
 
 ## Regras do campeonato (não invente, elas são específicas)
 
-- Partida até 4 pontos, sem empate. Pontos = games do vencedor − do perdedor
-  (mínimo 1). Quem perde não pontua.
+- Partida até 4 games. Pontos = games do vencedor − do perdedor (mínimo 1).
+  Quem perde não pontua.
+- **O empate no fim é configurável** (`sessions.desempate`, `src/lib/desempate.ts`):
+  `nenhum` (quem chega ao alvo primeiro leva — o que o app sempre fez),
+  `vantagem` (“vai a 2”: o 3x3 não fecha, segue até abrir dois games),
+  `tie7` e `tie10` (o 3x3 sai num tie de 7 ou 10 pontos corridos).
+  `desempate_vai2` diz que o **tie** também só fecha com 2 de diferença.
+  **Só o `vantagem` muda o que dá para lançar**: os botões do placar passam a
+  mostrar 5x3, 6x4, 7x5 e o vencedor deixa de ser sempre o alvo. Nos ties o
+  placar em games continua 4x3 — o tie decide o game que fecha —, então ali a
+  configuração só muda a regra anunciada na tela.
+- **Cada grupo tem uma cor** (`--g1`…`--g8`, `classeDoGrupo`), na etiqueta, na
+  caixa do grupo, na linha da fila e na borda do cartão da partida. São cores
+  escolhidas para se distinguirem **entre si** na beira da quadra, e por isso
+  não saem da paleta da marca.
 - **Não há rodadas.** O play é uma **fila de partidas**; cada quadra que vaga
   puxa da fila a partida cujas quatro jogadores estão livres, dando preferência a
   quem está fora há mais tempo (`proximasDasQuadras`).
@@ -86,6 +99,21 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     **confronto direto** → nome. Nunca há empate real: a colocação sai por
     posição na lista ordenada.
   - `matches.fase` (1 a 4) separa as fases; `sessions.duos` guarda as duplas.
+  - **Não existe “Vai até” neste formato**: cada fase tem os seus games
+    (`sessions.alvos`), então o campo some da tela de criar. O padrão de
+    jogadores por grupo também muda para **4** ao escolher o formato, que é
+    como o grupo joga.
+  - **O botão da próxima fase fica embaixo**, num cartão próprio logo antes do
+    “Finalizar o play”, e enquanto falta fase o finalizar vira `ghost` e pede
+    confirmação. Ele ficava no meio dos botões do topo e quem rolava até o fim
+    encontrava primeiro o botão que encerra tudo — encerrar antes do mata-mata
+    deixa o play **sem pódio**, porque a fase 1 não pontua.
+  - **O ranking do dia mostra as DUPLAS** (`DuplasDoDia`), antes do individual.
+    No mata-mata os dois de uma dupla ganham e perdem as mesmas partidas, então
+    empatam em tudo — nenhum critério os separa, e não é falta de desempate. A
+    ordem das duplas é **até onde chegaram** (a maior `fase` que jogaram), e só
+    depois vitórias/pontos/saldo: com bye, quem foi direto à semi tem uma
+    vitória a menos que quem ganhou as quartas, e as duas caíram na mesma altura.
 - **Dois formatos** clássicos, também escolhidos ao criar o play: `todos` (rodízio único) e
   `grupos` (o mesmo rodízio dentro de grupos formados por nível, grupo 1 com as
   mais bem pontuadas). Nos grupos os pontos continuam **individuais** e o

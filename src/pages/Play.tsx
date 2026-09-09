@@ -29,12 +29,21 @@ import {
   balance,
   buildHistory,
   computeStats,
+  duoStats,
   pairKey,
   playedMatches,
   ratings,
   rankPlayers,
   type PlayerStat,
 } from '../lib/stats'
+import {
+  DESEMPATES,
+  desempateDe,
+  explicarDesempate,
+  gamesDoPerdedor,
+  gamesDoVencedor,
+  type Desempate,
+} from '../lib/desempate'
 import { computeStreaks, podiosDoDia, streakLevel, vagasDoPodio } from '../lib/streaks'
 import {
   CATEGORIAS,
@@ -269,6 +278,8 @@ function NewPlay({
   /** Pontos que fecham a partida em cada fase: grupos, duplas, semi, final. */
   const [alvos, setAlvos] = useState<number[]>([4, 4, 4, 4])
   const [porGrupo, setPorGrupo] = useState(8)
+  const [desempate, setDesempate] = useState<Desempate>(desempateDe(preset.desempate))
+  const [desempateVai2, setDesempateVai2] = useState(preset.desempate_vai2 ?? false)
   const [ranked, setRanked] = useState(preset.ranked ?? true)
   const [importando, setImportando] = useState(false)
   const [target, setTarget] = useState(preset.target ?? 4)
@@ -384,6 +395,8 @@ function NewPlay({
         courts: effCourts,
         rounds: fila.length, // a coluna se chama rounds; hoje e o total de partidas
         target,
+        desempate,
+        desempate_vai2: desempate === 'tie7' || desempate === 'tie10' ? desempateVai2 : false,
         player_ids: selected,
         status: 'open',
         created_at: new Date().toISOString(),
@@ -527,11 +540,55 @@ function NewPlay({
                     : 'quadras disponíveis hoje'}
               </em>
             </div>
-            <div className="field">
-              <span>Vai até</span>
-              <Stepper value={target} min={1} max={21} onChange={setTarget} />
-              <em className="hint">pontos para vencer a partida — o padrão é 4</em>
+            {!emDuplas && (
+              <div className="field">
+                <span>Vai até</span>
+                <Stepper value={target} min={1} max={21} onChange={setTarget} />
+                <em className="hint">games para vencer a partida — o padrão é 4</em>
+              </div>
+            )}
+          </div>
+
+          <div className="field">
+            <span>Se empatar no fim</span>
+            <div className="chips-scroll">
+              {DESEMPATES.map((d) => (
+                <button
+                  key={d.valor}
+                  className={`chip ${desempate === d.valor ? 'on' : 'off'}`}
+                  style={{ flex: 'none' }}
+                  onClick={() => setDesempate(d.valor)}
+                >
+                  {d.rotulo}
+                </button>
+              ))}
             </div>
+            <em className="hint">
+              {explicarDesempate(emDuplas ? alvos[0] : target, desempate, desempateVai2)}
+            </em>
+            {(desempate === 'tie7' || desempate === 'tie10') && (
+              <label className="switch" style={{ marginTop: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={desempateVai2}
+                  onChange={(e) => setDesempateVai2(e.target.checked)}
+                />
+                <span>
+                  <strong>O tie também vai a 2</strong>
+                  <span className="tiny muted">
+                    {desempateVai2
+                      ? 'o tie só fecha com dois pontos de diferença — 7x5 sim, 7x6 não'
+                      : 'quem chegar primeiro na pontuação do tie leva, mesmo por um ponto'}
+                  </span>
+                </span>
+              </label>
+            )}
+            {emDuplas && (
+              <em className="hint" style={{ marginTop: 4 }}>
+                Aqui cada fase tem os seus games (lá embaixo), então não existe um
+                “vai até” só — a regra do empate vale em todas elas.
+              </em>
+            )}
           </div>
 
           <div className="field">
@@ -540,10 +597,24 @@ function NewPlay({
               <button className={format === 'todos' ? 'on' : ''} onClick={() => setFormat('todos')}>
                 🔁 Todos com todos
               </button>
-              <button className={emDuplas ? 'on' : ''} onClick={() => setFormat('grupos-duplas')}>
+              <button
+                className={emDuplas ? 'on' : ''}
+                onClick={() => {
+                  // o organizador joga esse formato em grupos de 4; nos outros
+                  // o grupo grande e que faz sentido, por isso o padrao muda junto
+                  if (!emDuplas) setPorGrupo(4)
+                  setFormat('grupos-duplas')
+                }}
+              >
                 🤝 Grupos + duplas
               </button>
-              <button className={format === 'grupos' ? 'on' : ''} onClick={() => setFormat('grupos')}>
+              <button
+                className={format === 'grupos' ? 'on' : ''}
+                onClick={() => {
+                  if (emDuplas) setPorGrupo(8)
+                  setFormat('grupos')
+                }}
+              >
                 👥 Em grupos
               </button>
             </div>
@@ -631,7 +702,8 @@ function NewPlay({
                 )}
               </>
             )}{' '}
-            Quem vence leva <strong>{target} menos os games da adversária</strong> em pontos.
+            Quem vence leva <strong>os games que fez menos os da adversária</strong> em pontos
+            (mínimo 1), e quem perde não pontua.
           </p>
 
           {selected.length >= 4 && effCourts < courts && travadoPorGrupo && (
@@ -748,7 +820,7 @@ function NewPlay({
           {(format === 'grupos' || emDuplas) && grupos.length > 1 && (
             <div className="stack" style={{ marginTop: 4 }}>
               {grupos.map((g, i) => (
-                <div key={i} className="grupo-box">
+                <div key={i} className={`grupo-box ${classeDoGrupo(i + 1)}`}>
                   <div className="grupo-nome">Grupo {i + 1} · {g.length} jogadores · {partidasDoRodizio(g.length)} partidas</div>
                   <div className="tiny">{g.map(nameOf).join(' · ')}</div>
                 </div>
@@ -939,6 +1011,15 @@ function PlayDetail({
    * rodada preliminar, e ai a semifinal cai na fase 4 e nao na 3. O que
    * identifica a rodada e QUANTOS JOGOS ela tem: 1 e a final, 2 e a semifinal.
    */
+  /** So as partidas que valem no grupos+duplas: da fase 2 em diante. */
+  const partidasDaFase2 = useMemo(
+    () => matches.filter((m) => (m.fase ?? 1) >= 2 && isPlayed(m)),
+    [matches],
+  )
+
+  /** O modo de desempate deste play. Plays antigos nao tem: e `nenhum`. */
+  const desempate = desempateDe(session.desempate)
+
   const alvoDe = (m: Match) => {
     const alvos = session.alvos
     if (!alvos?.length) return session.target
@@ -972,6 +1053,8 @@ function PlayDetail({
     daUltimaRodada.every(isPlayed) &&
     vivas.length > 1
   const rotuloDaProxima = vivas.length > 1 ? nomeDaRodada(vivas.length) : ''
+  /** Ha um proximo passo obrigatorio antes de encerrar o play? */
+  const faltaFase = podeGerarFase2 || podeGerarRodada
 
   const dayRows = useMemo(() => {
     const todas = playedMatches(data, { sessionId: session.id })
@@ -1299,6 +1382,18 @@ function PlayDetail({
   }
 
   async function finish() {
+    // encerrar no meio do grupos+duplas apaga a noite inteira: a fase 1 nao
+    // pontua, entao o play terminaria sem podio e sem ninguem segurando a
+    // sequencia. Por isso este aviso vem antes do das partidas sem placar.
+    if (
+      faltaFase &&
+      !confirm(
+        podeGerarFase2
+          ? 'O mata-mata ainda nao foi sorteado. Como so a fase 2 vale pontos, finalizar agora deixa o play sem podio. Finalizar mesmo assim?'
+          : `Ainda ha ${vivas.length} duplas vivas no mata-mata. Finalizar mesmo assim?`,
+      )
+    )
+      return
     if (doneCount < matches.length && !confirm(`Ainda faltam ${matches.length - doneCount} partidas sem placar. Finalizar mesmo assim?`)) return
     await saveSession({ ...session, status: 'finished' })
     // o credito do avulso vale por UM play: finalizado, ele volta a dever
@@ -1405,7 +1500,11 @@ function PlayDetail({
           <div style={{ fontSize: 19, fontWeight: 800 }}>{session.title}</div>
           <div className="small muted">
             {dateLabel(session.date)} · {session.player_ids.length} jogadores · {session.courts} quadras
-            {grupos && grupos.length > 1 && ` · ${grupos.length} grupos`} · até {session.target} pontos
+            {grupos && grupos.length > 1 && ` · ${grupos.length} grupos`}
+            {soFase2 ? ' · games por fase' : ` · até ${session.target} games`}
+          </div>
+          <div className="tiny muted" style={{ marginTop: 2 }}>
+            {explicarDesempate(session.target, desempate, session.desempate_vai2 ?? false)}
           </div>
         </div>
         <div className="grid3" style={{ marginTop: 12 }}>
@@ -1421,16 +1520,6 @@ function PlayDetail({
             onToast(ok ? 'Partidas copiadas 💬' : 'Não consegui copiar')
           }}>💬 Enviar partidas</button>
           <button className="btn ghost sm" onClick={() => setShowRank(true)}>🏆 Ranking do dia</button>
-          {editable && podeGerarFase2 && (
-            <button className="btn marca sm" onClick={() => void gerarFase2()}>
-              🤝 Sortear o mata-mata
-            </button>
-          )}
-          {editable && podeGerarRodada && (
-            <button className="btn marca sm" onClick={() => void gerarProximaRodada()}>
-              🥅 Montar {rotuloDaProxima.toLowerCase()}
-            </button>
-          )}
           {editable && (
             <>
               <button className="btn ghost sm" onClick={() => void regenerarPendentes()}>
@@ -1481,7 +1570,7 @@ function PlayDetail({
           <div className="section-title">👥 Grupos</div>
           <div className="stack">
             {grupos.map((g, i) => (
-              <div key={i} className="grupo-box">
+              <div key={i} className={`grupo-box ${classeDoGrupo(i + 1)}`}>
                 <div className="grupo-nome">Grupo {i + 1} · {g.length} jogadores</div>
                 <div className="tiny">{g.map(nameOf).join(' · ')}</div>
               </div>
@@ -1521,6 +1610,7 @@ function PlayDetail({
                 match={m}
                 quadra={q}
                 target={alvoDe(m)}
+                desempate={desempate}
                 editable={editable}
                 iniciada={!!atual}
                 inicio={inicioDe(m)}
@@ -1568,8 +1658,30 @@ function PlayDetail({
         onCorrigir={(m) => setCorrigindo(m)}
       />
 
+      {editable && faltaFase && (
+        <div className="card" style={{ borderColor: 'var(--marca)' }}>
+          <div className="section-title" style={{ marginTop: 0 }}>
+            ⏭️ O play ainda tem fase pela frente
+          </div>
+          <p className="tiny muted" style={{ marginTop: 0 }}>
+            {podeGerarFase2
+              ? 'A fase de grupos acabou. O próximo passo é formar as duplas fixas e sortear o mata-mata — só depois disso o play tem pódio.'
+              : `A rodada terminou e ainda há ${vivas.length} duplas vivas. Monte a próxima antes de encerrar.`}
+          </p>
+          <button
+            className="btn marca block"
+            onClick={() => void (podeGerarFase2 ? gerarFase2() : gerarProximaRodada())}
+          >
+            {podeGerarFase2 ? '🤝 Sortear o mata-mata' : `🥅 Montar ${rotuloDaProxima.toLowerCase()}`}
+          </button>
+        </div>
+      )}
+
       {editable && (
-        <button className="btn verde block" onClick={() => void finish()}>
+        <button
+          className={`btn ${faltaFase ? 'ghost' : 'verde'} block`}
+          onClick={() => void finish()}
+        >
           ✅ Finalizar o play e somar os pontos
         </button>
       )}
@@ -1596,6 +1708,7 @@ function PlayDetail({
         <CorrigirPlacar
           match={corrigindo}
           target={alvoDe(corrigindo)}
+          desempate={desempate}
           onClose={() => setCorrigindo(null)}
           onScore={(a, b) => { setScore(corrigindo, a, b); setCorrigindo(null) }}
         />
@@ -1631,6 +1744,7 @@ function PlayDetail({
                   {award.usouVida && ' (uma vida foi consumida para segurar o status hoje)'}
                 </div>
               )}
+              {soFase2 && <DuplasDoDia partidas={partidasDaFase2} />}
               {podios.length > 1 ? (
                 podios.map((p) => (
                   <div key={p.grupo} style={{ marginBottom: 14 }}>
@@ -1812,9 +1926,14 @@ function Situacao({
   )
 }
 
+/** A cor de um grupo, 1 a 8, repetindo da nona em diante. */
+export function classeDoGrupo(grupo?: number | null): string {
+  return grupo ? `g${((grupo - 1) % 8) + 1}` : ''
+}
+
 function GrupoTag({ grupo, total }: { grupo?: number; total: number }) {
   if (!grupo || total <= 1) return null
-  return <span className={`grupo-tag g${((grupo - 1) % 4) + 1}`}>G{grupo}</span>
+  return <span className={`grupo-tag ${classeDoGrupo(grupo)}`}>G{grupo}</span>
 }
 
 function Duo({ ids, ocupados }: { ids: [string, string]; ocupados?: Set<string> }) {
@@ -1852,6 +1971,7 @@ function MatchCard({
   repetida,
   espera,
   jogadoresDoPlay,
+  desempate,
   onScore,
   onIniciar,
   onCancelarInicio,
@@ -1861,6 +1981,7 @@ function MatchCard({
   match: Match
   quadra: number
   target: number
+  desempate: Desempate
   editable: boolean
   iniciada: boolean
   inicio: string | null
@@ -1883,6 +2004,8 @@ function MatchCard({
   const [winner, setWinner] = useState<'a' | 'b' | null>(null)
   const [trocando, setTrocando] = useState(false)
   const noTime = jogadoresDaPartida(match)
+  // com um grupo so a cor nao diz nada; com varios e o que identifica a quadra
+  const corDoGrupo = totalGrupos > 1 ? classeDoGrupo(grupo) : ''
 
   const modalTroca = trocando && (
     <TrocarJogadores
@@ -1916,7 +2039,7 @@ function MatchCard({
   // ---- so leitura ----
   if (!editable) {
     return (
-      <div className={`match${iniciada ? ' em-quadra' : ''}`}>
+      <div className={`match ${corDoGrupo}${iniciada ? ' em-quadra' : ''}`}>
         {cabecalho}
         <div className="team"><Duo ids={match.team_a} /></div>
         <div className="vs">X</div>
@@ -1929,30 +2052,34 @@ function MatchCard({
   if (winner) {
     const loserIds = winner === 'a' ? match.team_b : match.team_a
     return (
-      <div className="match live">
+      <div className={`match live ${corDoGrupo}`}>
         <div className="match-head">
           <span>Quadra {quadra}</span>
           <button className="linkish" onClick={() => setWinner(null)}>‹ voltar</button>
         </div>
         <div className="team win">
           <Duo ids={winner === 'a' ? match.team_a : match.team_b} />
-          <span className="score-box">{target}</span>
+          <span className="score-box">{desempate === 'vantagem' ? `${target}+` : target}</span>
         </div>
         <div className="ask">Quantos games <strong>{nameOf(loserIds[0])} + {nameOf(loserIds[1])}</strong> fez?</div>
         <div className="games-row">
-          {Array.from({ length: target }, (_, n) => (
-            <button
-              key={n}
-              className="game-btn"
-              onClick={() => {
-                setWinner(null)
-                if (winner === 'a') onScore(match, target, n)
-                else onScore(match, n, target)
-              }}
-            >
-              {n}
-            </button>
-          ))}
+          {gamesDoPerdedor(target, desempate).map((n) => {
+            const venceu = gamesDoVencedor(target, desempate, n)
+            return (
+              <button
+                key={n}
+                className="game-btn"
+                title={`${venceu}x${n}`}
+                onClick={() => {
+                  setWinner(null)
+                  if (winner === 'a') onScore(match, venceu, n)
+                  else onScore(match, n, venceu)
+                }}
+              >
+                {venceu === target ? n : `${venceu}x${n}`}
+              </button>
+            )
+          })}
         </div>
       </div>
     )
@@ -1960,7 +2087,7 @@ function MatchCard({
 
   // ---- passo 1: quem venceu ----
   return (
-    <div className={`match live${iniciada ? ' em-quadra' : ''}`}>
+    <div className={`match live ${corDoGrupo}${iniciada ? ' em-quadra' : ''}`}>
       {cabecalho}
 
       {iniciada ? (
@@ -2074,7 +2201,10 @@ function ListaDePartidas({
                 )
               : []
             return (
-              <div key={m.id} className="fila-linha">
+              <div
+                key={m.id}
+                className={`fila-linha ${totalGrupos > 1 ? classeDoGrupo(grupoDe.get(m.team_a[0])) : ''}`}
+              >
                 <span className="fila-num">
                   {numerar ? `${i + 1}ª` : m.round}
                   <GrupoTag grupo={grupoDe.get(m.team_a[0])} total={totalGrupos} />
@@ -2137,11 +2267,13 @@ function ListaDePartidas({
 function CorrigirPlacar({
   match,
   target,
+  desempate,
   onScore,
   onClose,
 }: {
   match: Match
   target: number
+  desempate: Desempate
   onScore: (a: number | null, b: number | null) => void
   onClose: () => void
 }) {
@@ -2159,15 +2291,19 @@ function CorrigirPlacar({
           <strong>{nameOf(perdedors[0])} + {nameOf(perdedors[1])}</strong>
         </div>
         <div className="games-row">
-          {Array.from({ length: target }, (_, n) => (
+          {gamesDoPerdedor(target, desempate).map((n) => {
+            const venceu = gamesDoVencedor(target, desempate, n)
+            return (
             <button
               key={n}
               className="game-btn"
-              onClick={() => (winner === 'a' ? onScore(target, n) : onScore(n, target))}
+              title={`${venceu}x${n}`}
+              onClick={() => (winner === 'a' ? onScore(venceu, n) : onScore(n, venceu))}
             >
-              {n}
+              {venceu === target ? n : `${venceu}x${n}`}
             </button>
-          ))}
+            )
+          })}
         </div>
       </Modal>
     )
@@ -2395,5 +2531,89 @@ function ResolverCadastro({
         Deixar de fora deste play
       </button>
     </Modal>
+  )
+}
+
+
+/**
+ * O ranking das duplas do mata-mata.
+ *
+ * Ordena por ATE ONDE A DUPLA CHEGOU, nao por vitorias: com bye, quem passou
+ * direto para a semi e perdeu tem uma vitoria a menos que quem ganhou as
+ * quartas e perdeu a semi -- e as duas cairam na mesma altura. A fase mais
+ * alta que a dupla jogou e a medida honesta; vitorias so desempatam dentro
+ * dela, o que separa a campea da vice.
+ */
+function DuplasDoDia({ partidas }: { partidas: Match[] }) {
+  const { nameOf, playerById } = useStore()
+
+  const linhas = useMemo(() => {
+    const stats = duoStats(partidas)
+    const ateFase = new Map<string, number>()
+    for (const m of partidas) {
+      const fase = m.fase ?? 2
+      for (const time of [m.team_a, m.team_b]) {
+        const k = pairKey(time[0], time[1])
+        ateFase.set(k, Math.max(ateFase.get(k) ?? 0, fase))
+      }
+    }
+    return [...stats.values()]
+      .map((d) => ({ ...d, ateFase: ateFase.get(d.key) ?? 0, saldo: d.gamesWon - d.gamesLost }))
+      .sort(
+        (x, y) =>
+          y.ateFase - x.ateFase ||
+          y.wins - x.wins ||
+          y.points - x.points ||
+          y.saldo - x.saldo ||
+          nameOf(x.a).localeCompare(nameOf(y.a), 'pt-BR'),
+      )
+  }, [partidas, nameOf])
+
+  if (linhas.length === 0) return null
+
+  return (
+    <>
+      <div className="section-title" style={{ fontSize: 13 }}>🤝 As duplas do mata-mata</div>
+      <div className="scroll-x">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th style={{ textAlign: 'left' }}>Dupla</th>
+              <th>V</th>
+              <th>D</th>
+              <th>Pts</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((d, i) => (
+              <tr key={d.key}>
+                <td className={`rank-pos top${i + 1}`} style={{ fontWeight: 800 }}>{i + 1}</td>
+                <td>
+                  <div className="row" style={{ gap: 6 }}>
+                    <Avatar player={playerById(d.a)} size={24} />
+                    <Avatar player={playerById(d.b)} size={24} />
+                    <span className="ellipsis">
+                      {nameOf(d.a)} + {nameOf(d.b)}
+                    </span>
+                    {i === 0 && d.losses === 0 && <span title="campeã do dia">🏆</span>}
+                  </div>
+                </td>
+                <td>{d.wins}</td>
+                <td>{d.losses}</td>
+                <td style={{ fontWeight: 800, color: 'var(--marca)' }}>{d.points}</td>
+                <td>{d.saldo > 0 ? `+${d.saldo}` : d.saldo}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="tiny muted" style={{ marginTop: 6 }}>
+        A ordem é até onde a dupla chegou; vitórias e saldo só desempatam dentro da mesma fase.
+        Na tabela individual os dois de uma dupla empatam em tudo — ganharam e perderam as mesmas
+        partidas —, e é por isso que a dupla é a medida do dia aqui.
+      </p>
+    </>
   )
 }

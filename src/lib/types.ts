@@ -71,6 +71,14 @@ export type PlaySession = {
    */
   alvos?: number[] | null
   /**
+   * O que fazer quando as duas duplas chegam em `target - 1` (o 3x3):
+   * `nenhum`, `vantagem` (vai a 2), `tie7` ou `tie10`. Ver
+   * `src/lib/desempate.ts`. Ausente = `nenhum`, como os plays antigos.
+   */
+  desempate?: string | null
+  /** So para tie7/tie10: o proprio tie tambem precisa de 2 pontos de diferenca. */
+  desempate_vai2?: boolean | null
+  /**
    * O play vale para o campeonato? `false` = play avulso: as partidas contam
    * no historico e no equilibrio das duplas, mas nao somam pontos no ranking
    * do mes nem mexem nas sequencias. Ausente conta como `true` (plays antigos).
