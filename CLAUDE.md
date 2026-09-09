@@ -71,7 +71,14 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Sortear a
     fase 2"), porque depende da colocação final.
   - **Só a fase 2 vale pontos** no pódio do dia, e o pódio é **por chave**.
-  - `matches.fase` (1 ou 2) separa as duas; `sessions.duos` guarda as duplas.
+  - *Semifinal* (fase 3): as **4 melhores duplas** da fase 2, cruzando 1ª×4ª e
+    2ª×3ª. *Final* (fase 4): as vencedoras.
+  - **Pontos por fase**: `sessions.alvos` guarda `[grupos, duplas, semi, final]`,
+    então a final pode ser mais longa que os grupos.
+  - Desempate da colocação no grupo: pontos → diferença de games → vitórias →
+    **confronto direto** → nome. Nunca há empate real: a colocação sai por
+    posição na lista ordenada.
+  - `matches.fase` (1 a 4) separa as fases; `sessions.duos` guarda as duplas.
 - **Dois formatos** clássicos, também escolhidos ao criar o play: `todos` (rodízio único) e
   `grupos` (o mesmo rodízio dentro de grupos formados por nível, grupo 1 com as
   mais bem pontuadas). Nos grupos os pontos continuam **individuais** e o

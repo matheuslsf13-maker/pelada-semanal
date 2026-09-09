@@ -32,3 +32,17 @@ comment on column public.sessions.duos is
   'formato grupos-duplas: as duplas fixas da fase 2, na ordem de forca';
 comment on column public.matches.fase is
   '1 = fase de grupos, 2 = fase das duplas fixas';
+
+-- ------------------------------------------------------------
+--  Pontos que fecham a partida em CADA fase.
+--  Lista de 4: [grupos, duplas fixas, semifinal, final].
+--  Nulo = usa o `target` do play inteiro, como nos outros formatos.
+-- ------------------------------------------------------------
+alter table public.sessions
+  add column if not exists alvos jsonb;
+
+comment on column public.sessions.alvos is
+  'grupos-duplas: pontos que fecham a partida em cada fase [grupos, duplas, semi, final]';
+
+comment on column public.matches.fase is
+  '1 = grupos, 2 = duplas fixas, 3 = semifinal, 4 = final';

@@ -53,6 +53,11 @@ export type PlaySession = {
   /** Quantas duplas cabem em cada chave da fase 2. */
   por_chave?: number | null
   /**
+   * No formato `grupos-duplas`, quantos pontos fecham a partida em cada fase:
+   * [grupos, duplas fixas, semifinal, final]. Ausente = usa `target` em todas.
+   */
+  alvos?: number[] | null
+  /**
    * O play vale para o campeonato? `false` = play avulso: as partidas contam
    * no historico e no equilibrio das duplas, mas nao somam pontos no ranking
    * do mes nem mexem nas sequencias. Ausente conta como `true` (plays antigos).

@@ -26,12 +26,14 @@ import { dayRankingText, scheduleText } from '../lib/share'
 import { isPlayed, matchPoints } from '../lib/scoring'
 import { loadFins, loadInicios, saveFins, saveInicios, type Horarios } from '../lib/emQuadra'
 import {
+  balance,
   buildHistory,
   computeStats,
   pairKey,
   playedMatches,
   ratings,
   rankPlayers,
+  type PlayerStat,
 } from '../lib/stats'
 import { computeStreaks, podiosDoDia, streakLevel, vagasDoPodio } from '../lib/streaks'
 import { useWakeLock } from '../lib/wakelock'
@@ -247,6 +249,8 @@ function NewPlay({
   const [courts, setCourts] = useState(preset.courts ?? 3)
   const [format, setFormat] = useState<PlayFormat>(preset.format ?? 'todos')
   const [porChave, setPorChave] = useState(4)
+  /** Pontos que fecham a partida em cada fase: grupos, duplas, semi, final. */
+  const [alvos, setAlvos] = useState<number[]>([4, 4, 4, 4])
   const [porGrupo, setPorGrupo] = useState(8)
   const [ranked, setRanked] = useState(preset.ranked ?? true)
   const [importando, setImportando] = useState(false)
@@ -325,6 +329,7 @@ function NewPlay({
         // colocacao final de cada grupo
         duos: null,
         por_chave: emGrupos && emDuplas ? porChave : null,
+        alvos: emGrupos && emDuplas ? alvos : null,
         ranked,
       }
       await saveSession(session)
@@ -550,6 +555,26 @@ function NewPlay({
 
           {emDuplas && grupos.length > 1 && (
             <div className="toggle-card">
+              <div className="field">
+                <span>Pontos que fecham a partida, por fase</span>
+                <div className="stack" style={{ gap: 8 }}>
+                  {['Grupos', 'Duplas fixas', 'Semifinal', 'Final'].map((rotulo, i) => (
+                    <div key={rotulo} className="row spread" style={{ gap: 10 }}>
+                      <span className="tiny grow">{rotulo}</span>
+                      <Stepper
+                        value={alvos[i]}
+                        min={2}
+                        max={12}
+                        onChange={(v) => setAlvos((a) => a.map((x, k) => (k === i ? v : x)))}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <em className="hint">
+                  Dá para deixar a final mais longa que os grupos — é o jogo que decide o dia.
+                </em>
+              </div>
+
               <div className="field" style={{ marginBottom: 0 }}>
                 <span>Duplas por chave (fase 2)</span>
                 <Stepper value={porChave} min={2} max={6} onChange={setPorChave} />
@@ -641,6 +666,48 @@ function descreverGrupos(tamanhos: number[]): string {
   return `${n} grupos: ${lista}`
 }
 
+/**
+ * Confronto direto, como ultimo criterio antes do alfabetico.
+ *
+ * Vale so dentro do grupo: na fase de grupos cada um joga COM todos, entao dois
+ * empatados quase sempre ja se enfrentaram -- de lados opostos, com parceiros
+ * diferentes. Quem levou a melhor nesses jogos fica na frente.
+ *
+ * Nao mexe em quem ja estava separado por pontos, diferenca de games ou
+ * vitorias: so reordena blocos que empataram nos tres.
+ */
+function desempatarNoConfronto(rank: PlayerStat[], ms: Match[]): PlayerStat[] {
+  const iguais = (a: PlayerStat, b: PlayerStat) =>
+    a.points === b.points && balance(a) === balance(b) && a.wins === b.wins
+
+  /** Saldo de games de `a` nas partidas em que enfrentou `b`. */
+  const direto = (a: string, b: string): number => {
+    let saldo = 0
+    for (const m of ms) {
+      if (m.score_a === null || m.score_b === null) continue
+      const aEmA = m.team_a.includes(a)
+      const bEmA = m.team_a.includes(b)
+      if (aEmA === bEmA) continue // mesmo lado (ou fora): nao foi confronto
+      saldo += aEmA ? m.score_a - m.score_b : m.score_b - m.score_a
+    }
+    return saldo
+  }
+
+  const out: PlayerStat[] = []
+  let i = 0
+  while (i < rank.length) {
+    let j = i + 1
+    while (j < rank.length && iguais(rank[i], rank[j])) j++
+    const bloco = rank.slice(i, j)
+    if (bloco.length > 1) {
+      bloco.sort((x, y) => direto(y.player_id, x.player_id) - direto(x.player_id, y.player_id))
+    }
+    out.push(...bloco)
+    i = j
+  }
+  return out
+}
+
 /** "4 chaves de 2 duplas — 1 jogo por pessoa na fase 2". */
 function descreverFase2(grupos: string[][], porChave: number): string {
   const gente = grupos.reduce((t, g) => t + g.length, 0)
@@ -726,15 +793,25 @@ function PlayDetail({
   /** Neste formato o podio sai SO da fase 2; a fase 1 apenas define as duplas. */
   const soFase2 = session.format === 'grupos-duplas'
 
+  /** Quantos pontos fecham ESTA partida: cada fase pode ter o seu. */
+  const alvoDe = (m: Match) => session.alvos?.[(m.fase ?? 1) - 1] ?? session.target
+
   const daFase1 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 1), [matches])
   const daFase2 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 2), [matches])
+  const daSemi = useMemo(() => matches.filter((m) => m.fase === 3), [matches])
+  const daFinal = useMemo(() => matches.filter((m) => m.fase === 4), [matches])
   /** A fase 1 acabou e a 2 ainda nao nasceu: e a hora de sortear as duplas. */
   const podeGerarFase2 =
     soFase2 && daFase2.length === 0 && daFase1.length > 0 && daFase1.every(isPlayed)
+  const podeGerarSemi =
+    soFase2 && daSemi.length === 0 && daFase2.length > 0 && daFase2.every(isPlayed)
+  const podeGerarFinal =
+    soFase2 && daFinal.length === 0 && daSemi.length > 0 && daSemi.every(isPlayed)
 
   const dayRows = useMemo(() => {
     const todas = playedMatches(data, { sessionId: session.id })
-    const ms = soFase2 ? todas.filter((m) => (m.fase ?? 1) === 2) : todas
+    // a fase de grupos so serviu para formar as duplas; da fase 2 em diante conta
+    const ms = soFase2 ? todas.filter((m) => (m.fase ?? 1) >= 2) : todas
     return rankPlayers(computeStats(ms), nameOf)
   }, [data, session.id, nameOf, soFase2])
 
@@ -1081,7 +1158,13 @@ function PlayDetail({
     gruposDoPlay.forEach((g, gi) => {
       const doGrupo = new Set(g)
       const ms = daFase1.filter((m) => doGrupo.has(m.team_a[0]))
-      const rank = rankPlayers(computeStats(ms), nameOf).filter((r) => doGrupo.has(r.player_id))
+      const base = rankPlayers(computeStats(ms), nameOf).filter((r) => doGrupo.has(r.player_id))
+      // `rankPlayers` ja ordena por pontos, diferenca de games e vitorias. O que
+      // ele nao tem e o CONFRONTO DIRETO, que so faz sentido dentro do grupo:
+      // empatado em tudo, fica na frente quem venceu quando os dois se
+      // enfrentaram. O alfabetico continua como ultimo recurso, para a ordem
+      // nunca depender do acaso.
+      const rank = desempatarNoConfronto(base, ms)
       rank.forEach((r, k) => {
         colocacoes.push({
           id: r.player_id,
@@ -1108,6 +1191,71 @@ function PlayDetail({
     await saveSession({ ...session, duos, rounds: daFase1.length + novas.length })
     await saveMatches(novas)
     onToast(`Fase 2 sorteada: ${duos.length} duplas 🤝`)
+  }
+
+  /** Ordena as duplas da fase 2 pelo que fizeram: pontos e depois saldo. */
+  function classificacaoDasDuplas(ms: Match[]): { duo: [string, string]; pts: number; saldo: number }[] {
+    const conta = new Map<string, { duo: [string, string]; pts: number; saldo: number }>()
+    const chave = (d: readonly string[]) => [...d].sort().join('|')
+    for (const m of ms) {
+      if (m.score_a === null || m.score_b === null) continue
+      for (const [time, meus, deles] of [
+        [m.team_a, m.score_a, m.score_b],
+        [m.team_b, m.score_b, m.score_a],
+      ] as [[string, string], number, number][]) {
+        const k = chave(time)
+        const atual = conta.get(k) ?? { duo: time, pts: 0, saldo: 0 }
+        atual.pts += meus > deles ? Math.max(1, meus - deles) : 0
+        atual.saldo += meus - deles
+        conta.set(k, atual)
+      }
+    }
+    return [...conta.values()].sort((a, b) => b.pts - a.pts || b.saldo - a.saldo)
+  }
+
+  /**
+   * Semifinal: as QUATRO melhores duplas da fase 2, cruzando 1a x 4a e 2a x 3a.
+   *
+   * Cruzar em vez de 1a x 2a e o que premia quem foi melhor na fase 2 -- a
+   * melhor pega a mais fraca das classificadas. Com menos de 4 duplas nao ha
+   * semifinal: as duas melhores vao direto para a final.
+   */
+  async function gerarSemifinal() {
+    const cl = classificacaoDasDuplas(daFase2)
+    if (cl.length < 4) {
+      onToast('Poucas duplas para semifinal — gere a final direto')
+      return
+    }
+    const [p1, p2, p3, p4] = cl
+    const novas = planToMatches(session.id, [
+      { team_a: p1.duo, team_b: p4.duo, grupo: 0, fase: 3 },
+      { team_a: p2.duo, team_b: p3.duo, grupo: 0, fase: 3 },
+    ]).map((m, i) => ({ ...m, round: matches.length + i + 1 }))
+    await saveSession({ ...session, rounds: matches.length + novas.length })
+    await saveMatches(novas)
+    onToast('Semifinal sorteada 🥅')
+  }
+
+  /** Final: as vencedoras da semifinal. Sem semifinal, as duas melhores da fase 2. */
+  async function gerarFinal() {
+    let duplas: [string, string][]
+    if (daSemi.length > 0) {
+      duplas = daSemi
+        .filter((m) => m.score_a !== null && m.score_b !== null)
+        .map((m) => ((m.score_a as number) > (m.score_b as number) ? m.team_a : m.team_b))
+    } else {
+      duplas = classificacaoDasDuplas(daFase2).slice(0, 2).map((c) => c.duo)
+    }
+    if (duplas.length < 2) {
+      onToast('Ainda não dá para montar a final')
+      return
+    }
+    const novas = planToMatches(session.id, [
+      { team_a: duplas[0], team_b: duplas[1], grupo: 0, fase: 4 },
+    ]).map((m) => ({ ...m, round: matches.length + 1 }))
+    await saveSession({ ...session, rounds: matches.length + 1 })
+    await saveMatches(novas)
+    onToast('Final montada 🏆')
   }
 
   function trocar(m: Match, sai: string, entra: string) {
@@ -1149,6 +1297,16 @@ function PlayDetail({
           {editable && podeGerarFase2 && (
             <button className="btn marca sm" onClick={() => void gerarFase2()}>
               🤝 Sortear a fase 2
+            </button>
+          )}
+          {editable && podeGerarSemi && (
+            <button className="btn marca sm" onClick={() => void gerarSemifinal()}>
+              🥅 Montar a semifinal
+            </button>
+          )}
+          {editable && podeGerarFinal && (
+            <button className="btn marca sm" onClick={() => void gerarFinal()}>
+              🏆 Montar a final
             </button>
           )}
           {editable && (
@@ -1231,7 +1389,7 @@ function PlayDetail({
                 key={m.id}
                 match={m}
                 quadra={q}
-                target={session.target}
+                target={alvoDe(m)}
                 editable={editable}
                 iniciada={!!atual}
                 inicio={inicioDe(m)}
@@ -1274,7 +1432,7 @@ function PlayDetail({
         totalGrupos={grupos?.length ?? 1}
         repetidas={duplasRepetidas}
         emQuadra={ocupados}
-        target={session.target}
+        alvoDe={alvoDe}
         editable={editable}
         onCorrigir={(m) => setCorrigindo(m)}
       />
@@ -1306,7 +1464,7 @@ function PlayDetail({
       {corrigindo && (
         <CorrigirPlacar
           match={corrigindo}
-          target={session.target}
+          target={alvoDe(corrigindo)}
           onClose={() => setCorrigindo(null)}
           onScore={(a, b) => { setScore(corrigindo, a, b); setCorrigindo(null) }}
         />
@@ -1731,7 +1889,7 @@ function ListaDePartidas({
   totalGrupos,
   repetidas,
   emQuadra,
-  target,
+  alvoDe,
   editable,
   onCorrigir,
 }: {
@@ -1748,7 +1906,8 @@ function ListaDePartidas({
   totalGrupos: number
   repetidas: Map<string, string[]>
   emQuadra: Set<string>
-  target?: number
+  /** Pontos que fecham a partida; cada fase pode ter o seu. */
+  alvoDe?: (m: Match) => number
   editable?: boolean
   onCorrigir?: (m: Match) => void
 }) {
@@ -1821,7 +1980,7 @@ function ListaDePartidas({
                 {jogada && editable && onCorrigir && (
                   <button
                     className="btn ghost sm"
-                    title={`corrigir o placar (partida até ${target} pontos)`}
+                    title={`corrigir o placar (partida até ${alvoDe ? alvoDe(m) : '?'} pontos)`}
                     onClick={() => onCorrigir(m)}
                   >✏️</button>
                 )}
