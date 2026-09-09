@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CATEGORIAS, type Categoria } from '../lib/mensalidade'
-import { conciliar, parseRoster, precisaConferir, type ItemDaLista } from '../lib/roster'
+import { conciliar, normalizar, parseRoster, precisaConferir, type ItemDaLista } from '../lib/roster'
 import { useStore } from '../lib/store'
 import { uid, type Player } from '../lib/types'
 import { Avatar, Modal } from './ui'
@@ -47,8 +47,30 @@ export default function ImportarLista({
     setItens(conciliar(nomes, data.players))
   }
 
-  /** Categoria de quem a lista criar. Quem ja existe mantem a dele. */
+  /** Padrao do lote: vale para todo mundo que nao foi ajustado a mao. */
   const [categoriaNovos, setCategoriaNovos] = useState<Categoria>('convidado')
+  /**
+   * Ajustes individuais, guardados pelo NOME normalizado.
+   *
+   * Por posicao na lista, "o 2o e avulso" continuaria valendo depois de voltar
+   * e colar outra lista -- em cima de outra pessoa.
+   */
+  const [catPorNome, setCatPorNome] = useState<Record<string, Categoria>>({})
+
+  /** Como ESTE atleta vai pagar: o ajuste dele, ou o padrao do lote. */
+  function categoriaDoItem(texto: string): Categoria {
+    return catPorNome[normalizar(texto)] ?? categoriaNovos
+  }
+
+  function ajustar(texto: string, c: Categoria) {
+    setCatPorNome((m) => ({ ...m, [normalizar(texto)]: c }))
+  }
+
+  /** Trocar o padrao recomeca do zero: some com os ajustes individuais. */
+  function trocarPadrao(c: Categoria) {
+    setCategoriaNovos(c)
+    setCatPorNome({})
+  }
 
   function trocar(idx: number, valor: string) {
     setItens((atual) =>
@@ -79,7 +101,7 @@ export default function ImportarLista({
           active: true,
           created_at: new Date().toISOString(),
           aliases: [],
-          categoria: categoriaNovos,
+          categoria: categoriaDoItem(it.texto),
           pago_mes: null,
           pago_avulso: false,
         }
@@ -170,6 +192,31 @@ export default function ImportarLista({
           )}
         </div>
 
+        {novas > 0 && (
+          <div className="card" style={{ marginTop: 0, marginBottom: 12 }}>
+            <div className="section-title" style={{ fontSize: 13 }}>
+              {novas === 1 ? 'O novo atleta paga como' : 'Os novos atletas pagam como'}
+            </div>
+            <div className="chips-scroll">
+              {CATEGORIAS.map((c) => (
+                <button
+                  key={c.valor}
+                  className={`chip ${categoriaNovos === c.valor ? 'on' : 'off'}`}
+                  style={{ flex: 'none' }}
+                  onClick={() => trocarPadrao(c.valor)}
+                >
+                  {c.rotulo}
+                </button>
+              ))}
+            </div>
+            <p className="tiny muted" style={{ marginTop: 6, marginBottom: 0 }}>
+              {CATEGORIAS.find((c) => c.valor === categoriaNovos)?.explica}. Isso vale para todos
+              os novos — quem for exceção dá para trocar na linha dele, ali embaixo. Quem já
+              está cadastrado mantém a categoria dele.
+            </p>
+          </div>
+        )}
+
         <div className="stack">
           {itens.map((it, idx) => {
             const atencao = precisaConferir(it)
@@ -207,35 +254,26 @@ export default function ImportarLista({
                     ))}
                   </optgroup>
                 </select>
+
+                {!it.vincularA && (
+                  <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                    <span className="tiny muted nowrap">paga como</span>
+                    {CATEGORIAS.map((c) => (
+                      <button
+                        key={c.valor}
+                        className={`chip ${categoriaDoItem(it.texto) === c.valor ? 'on' : 'off'}`}
+                        style={{ flex: 'none', padding: '2px 8px', fontSize: 12 }}
+                        onClick={() => ajustar(it.texto, c.valor)}
+                      >
+                        {c.rotulo}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
-
-        {novas > 0 && (
-          <div className="card" style={{ marginTop: 14, marginBottom: 0 }}>
-            <div className="section-title" style={{ fontSize: 13 }}>
-              Como {novas === 1 ? 'o novo atleta paga' : 'os novos atletas pagam'}
-            </div>
-            <div className="chips-scroll">
-              {CATEGORIAS.map((c) => (
-                <button
-                  key={c.valor}
-                  className={`chip ${categoriaNovos === c.valor ? 'on' : 'off'}`}
-                  style={{ flex: 'none' }}
-                  onClick={() => setCategoriaNovos(c.valor)}
-                >
-                  {c.rotulo}
-                </button>
-              ))}
-            </div>
-            <p className="tiny muted" style={{ marginTop: 6, marginBottom: 0 }}>
-              {CATEGORIAS.find((c) => c.valor === categoriaNovos)?.explica}. Vale só para quem for
-              criado agora — quem já está cadastrado mantém a categoria dele. Dá para corrigir
-              depois {modo === 'cadastro' ? 'aqui mesmo' : 'em Jogadores'}.
-            </p>
-          </div>
-        )}
 
         <div className="row" style={{ gap: 8, marginTop: 14 }}>
           <button className="btn ghost grow" onClick={() => setItens(null)}>← Voltar</button>

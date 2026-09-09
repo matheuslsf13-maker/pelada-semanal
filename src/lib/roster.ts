@@ -9,15 +9,28 @@ import type { Player } from './types'
  * tolerando acento, caixa, apelido e pequenos erros de digitacao.
  */
 
-/** Tira numeracao, marcadores e espacos sobrando de cada linha. */
+/**
+ * Emoji, bandeirinha, coração, raquete, joinha -- e os modificadores que vem
+ * colados neles (tom de pele, seletor de variacao, o zero-width joiner que gruda
+ * dois emoji num so).
+ *
+ * `\p{So}` pega tambem os simbolos que nao sao emoji mas aparecem como
+ * marcador na lista do grupo (✅ ✔ ▪ ● ★).
+ */
+const ICONES = /[\p{Extended_Pictographic}\p{So}\uFE0F\u200D\u20E3\u{1F3FB}-\u{1F3FF}]/gu
+
+/** Tira icone, numeracao, marcadores e espacos sobrando de cada linha. */
 export function parseRoster(texto: string): string[] {
   const vistos = new Set<string>()
   const nomes: string[] = []
   for (const linha of texto.split(/\r?\n/)) {
     const limpo = linha
+      // os icones saem PRIMEIRO: em "✅ 3 - Bruno" e o emoji que esconde a
+      // numeracao do regex de baixo
+      .replace(ICONES, ' ')
       .replace(/^\s*\d+\s*[-–—.)\]]?\s*/, '') // "12 - ", "8-", "3."
       .replace(/^[\s*•‣·>-]+/, '')
-      .replace(/[\s.]+$/, '')
+      .replace(/[\s.–—-]+$/, '')
       .replace(/\s{2,}/g, ' ')
       .trim()
     if (!limpo) continue

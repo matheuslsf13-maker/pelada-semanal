@@ -135,6 +135,17 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   justamente o que se faz **uma** vez, antes da primeira noite. Nos dois modos a
   importação guarda a grafia da lista como apelido, para a próxima reconhecer
   sozinha, e tem **desfazer** que apaga só quem nasceu ali.
+  - **Os ícones da lista do WhatsApp são descartados** (`ICONES`, em
+    `roster.ts`): emoji, ✅, tom de pele, seletor de variação e o ZWJ que gruda
+    dois emoji. Saem **antes** da numeração, senão um "✅ 3 - Bruno" esconde o
+    "3 -" do regex. A comparação já ignorava ícone (`normalizar` só olha letra e
+    número) — o que estragava era o nome **criado**.
+  - **A categoria é por atleta.** Há um padrão para o lote inteiro e, em cada
+    linha que vai criar alguém, chips para a exceção — numa lista real o pessoal
+    fixo entra mensalista e os convidados da semana não. O ajuste é guardado
+    pelo **nome normalizado**, nunca pela posição: por índice, voltar e colar
+    outra lista jogava "o 2º é avulso" em cima de outra pessoa. Trocar o padrão
+    limpa os ajustes de propósito.
 - **Play avulso** (`sessions.ranked = false`): conta no histórico e na força,
   mas **não soma no ranking do mês nem mexe nas sequências**. Serve para o jogo
   fora de calendário que não é o campeonato.
