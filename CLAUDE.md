@@ -71,8 +71,11 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Sortear a
     fase 2"), porque depende da colocação final.
   - **Só a fase 2 vale pontos** no pódio do dia, e o pódio é **por chave**.
-  - *Semifinal* (fase 3): as **4 melhores duplas** da fase 2, cruzando 1ª×4ª e
-    2ª×3ª. *Final* (fase 4): as vencedoras.
+  - *Fase 2 em diante*: **mata-mata**. As duplas se cruzam pelas pontas (a
+    melhor pega a pior) e quem perde sai. As melhores passam de **bye** quando o
+    total não é potência de 2 — com 12 atletas, as duas primeiras duplas vão
+    direto à semifinal. `matches.fase` cresce a cada rodada; o nome (quartas,
+    semi, final) sai de quantas duplas sobram, não do número da fase.
   - **Pontos por fase**: `sessions.alvos` guarda `[grupos, duplas, semi, final]`,
     então a final pode ser mais longa que os grupos.
   - Desempate da colocação no grupo: pontos → diferença de games → vitórias →

@@ -5,9 +5,9 @@ import {
   formarGrupos,
   gruposEquilibrados,
   duplasDaFase2,
-  chavesDaFase2,
-  partidasDasChaves,
-  partidasDaFase2,
+  rodadaDoMataMata,
+  nomeDaRodada,
+  duplasVivas,
   type Colocacao,
   gerarFila,
   jogadoresDaPartida,
@@ -793,20 +793,47 @@ function PlayDetail({
   /** Neste formato o podio sai SO da fase 2; a fase 1 apenas define as duplas. */
   const soFase2 = session.format === 'grupos-duplas'
 
-  /** Quantos pontos fecham ESTA partida: cada fase pode ter o seu. */
-  const alvoDe = (m: Match) => session.alvos?.[(m.fase ?? 1) - 1] ?? session.target
+  /**
+   * Quantos pontos fecham ESTA partida.
+   *
+   * Os quatro alvos configurados sao grupos / duplas / semifinal / final. No
+   * mata-mata o numero da fase nao serve de indice -- com 20 atletas ha uma
+   * rodada preliminar, e ai a semifinal cai na fase 4 e nao na 3. O que
+   * identifica a rodada e QUANTOS JOGOS ela tem: 1 e a final, 2 e a semifinal.
+   */
+  const alvoDe = (m: Match) => {
+    const alvos = session.alvos
+    if (!alvos?.length) return session.target
+    const fase = m.fase ?? 1
+    if (fase === 1) return alvos[0] ?? session.target
+    const jogosNaFase = matches.filter((x) => (x.fase ?? 1) === fase).length
+    if (jogosNaFase === 1) return alvos[3] ?? session.target
+    if (jogosNaFase === 2) return alvos[2] ?? session.target
+    return alvos[1] ?? session.target
+  }
 
   const daFase1 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 1), [matches])
   const daFase2 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 2), [matches])
-  const daSemi = useMemo(() => matches.filter((m) => m.fase === 3), [matches])
-  const daFinal = useMemo(() => matches.filter((m) => m.fase === 4), [matches])
+  /** Todas as partidas do mata-mata (fase 2 em diante), por rodada. */
+  const doMataMata = useMemo(() => matches.filter((m) => (m.fase ?? 1) >= 2), [matches])
+  const ultimaFase = doMataMata.reduce((t, m) => Math.max(t, m.fase ?? 1), 1)
+  const daUltimaRodada = doMataMata.filter((m) => (m.fase ?? 1) === ultimaFase)
+  /** Quem ainda nao perdeu. Uma dupla so = ja tem campea. */
+  const vivas = useMemo(
+    () => (session.duos?.length ? duplasVivas(session.duos, doMataMata) : []),
+    [session.duos, doMataMata],
+  )
   /** A fase 1 acabou e a 2 ainda nao nasceu: e a hora de sortear as duplas. */
   const podeGerarFase2 =
     soFase2 && daFase2.length === 0 && daFase1.length > 0 && daFase1.every(isPlayed)
-  const podeGerarSemi =
-    soFase2 && daSemi.length === 0 && daFase2.length > 0 && daFase2.every(isPlayed)
-  const podeGerarFinal =
-    soFase2 && daFinal.length === 0 && daSemi.length > 0 && daSemi.every(isPlayed)
+  /** A rodada atual acabou e ainda ha mais de uma dupla viva. */
+  const podeGerarRodada =
+    soFase2 &&
+    daFase2.length > 0 &&
+    daUltimaRodada.length > 0 &&
+    daUltimaRodada.every(isPlayed) &&
+    vivas.length > 1
+  const rotuloDaProxima = vivas.length > 1 ? nomeDaRodada(vivas.length) : ''
 
   const dayRows = useMemo(() => {
     const todas = playedMatches(data, { sessionId: session.id })
@@ -823,11 +850,11 @@ function PlayDetail({
    * baixo nao diz nada. Nos outros formatos continua sendo o grupo.
    */
   const divisaoDoPodio = useMemo(() => {
-    if (!soFase2 || !session.duos?.length) return session.groups
-    return chavesDaFase2(session.duos, session.por_chave ?? 4).map((chave) =>
-      chave.flatMap((d) => [d[0], d[1]]),
-    )
-  }, [soFase2, session.duos, session.por_chave, session.groups])
+    // no mata-mata nao ha chave: o podio do dia e um so, pela campanha de cada
+    // um da fase 2 em diante
+    if (soFase2) return null
+    return session.groups
+  }, [soFase2, session.groups])
 
   /** Um podio por grupo (ou por chave, na fase 2); um so quando nao ha divisao. */
   const podios = useMemo(
@@ -1177,85 +1204,45 @@ function PlayDetail({
     })
 
     const duos = duplasDaFase2(colocacoes)
-    const chaves = chavesDaFase2(duos, session.por_chave ?? 4)
-    if (partidasDaFase2(chaves) === 0) {
-      onToast('Não deu para formar chaves — poucas duplas')
+    if (duos.length < 2) {
+      onToast('Poucas duplas para o mata-mata')
       return
     }
-    const fila = partidasDasChaves(chaves)
+    const { byes, jogos } = rodadaDoMataMata(duos)
+    const fila = jogos.map(([a, b]) => ({ team_a: a, team_b: b, grupo: 0, fase: 2 }))
     const novas = planToMatches(session.id, fila).map((m, i) => ({
       ...m,
-      // a fila da fase 2 entra depois da fase 1
       round: daFase1.length + i + 1,
     }))
     await saveSession({ ...session, duos, rounds: daFase1.length + novas.length })
     await saveMatches(novas)
-    onToast(`Fase 2 sorteada: ${duos.length} duplas 🤝`)
-  }
-
-  /** Ordena as duplas da fase 2 pelo que fizeram: pontos e depois saldo. */
-  function classificacaoDasDuplas(ms: Match[]): { duo: [string, string]; pts: number; saldo: number }[] {
-    const conta = new Map<string, { duo: [string, string]; pts: number; saldo: number }>()
-    const chave = (d: readonly string[]) => [...d].sort().join('|')
-    for (const m of ms) {
-      if (m.score_a === null || m.score_b === null) continue
-      for (const [time, meus, deles] of [
-        [m.team_a, m.score_a, m.score_b],
-        [m.team_b, m.score_b, m.score_a],
-      ] as [[string, string], number, number][]) {
-        const k = chave(time)
-        const atual = conta.get(k) ?? { duo: time, pts: 0, saldo: 0 }
-        atual.pts += meus > deles ? Math.max(1, meus - deles) : 0
-        atual.saldo += meus - deles
-        conta.set(k, atual)
-      }
-    }
-    return [...conta.values()].sort((a, b) => b.pts - a.pts || b.saldo - a.saldo)
+    onToast(
+      `${nomeDaRodada(duos.length)}: ${duos.length} duplas` +
+        (byes.length ? `, ${byes.length} de bye 🤝` : ' 🤝'),
+    )
   }
 
   /**
-   * Semifinal: as QUATRO melhores duplas da fase 2, cruzando 1a x 4a e 2a x 3a.
+   * A proxima rodada do mata-mata: quem nao perdeu segue, na ordem de forca.
    *
-   * Cruzar em vez de 1a x 2a e o que premia quem foi melhor na fase 2 -- a
-   * melhor pega a mais fraca das classificadas. Com menos de 4 duplas nao ha
-   * semifinal: as duas melhores vao direto para a final.
+   * Os byes da primeira rodada nao precisam ser guardados: quem nunca perdeu
+   * esta vivo, e `duplasVivas` deduz isso das partidas ja lancadas.
    */
-  async function gerarSemifinal() {
-    const cl = classificacaoDasDuplas(daFase2)
-    if (cl.length < 4) {
-      onToast('Poucas duplas para semifinal — gere a final direto')
+  async function gerarProximaRodada() {
+    if (vivas.length < 2) {
+      onToast('O mata-mata já tem campeã')
       return
     }
-    const [p1, p2, p3, p4] = cl
-    const novas = planToMatches(session.id, [
-      { team_a: p1.duo, team_b: p4.duo, grupo: 0, fase: 3 },
-      { team_a: p2.duo, team_b: p3.duo, grupo: 0, fase: 3 },
-    ]).map((m, i) => ({ ...m, round: matches.length + i + 1 }))
+    const { jogos } = rodadaDoMataMata(vivas)
+    const fase = ultimaFase + 1
+    const fila = jogos.map(([a, b]) => ({ team_a: a, team_b: b, grupo: 0, fase }))
+    const novas = planToMatches(session.id, fila).map((m, i) => ({
+      ...m,
+      round: matches.length + i + 1,
+    }))
     await saveSession({ ...session, rounds: matches.length + novas.length })
     await saveMatches(novas)
-    onToast('Semifinal sorteada 🥅')
-  }
-
-  /** Final: as vencedoras da semifinal. Sem semifinal, as duas melhores da fase 2. */
-  async function gerarFinal() {
-    let duplas: [string, string][]
-    if (daSemi.length > 0) {
-      duplas = daSemi
-        .filter((m) => m.score_a !== null && m.score_b !== null)
-        .map((m) => ((m.score_a as number) > (m.score_b as number) ? m.team_a : m.team_b))
-    } else {
-      duplas = classificacaoDasDuplas(daFase2).slice(0, 2).map((c) => c.duo)
-    }
-    if (duplas.length < 2) {
-      onToast('Ainda não dá para montar a final')
-      return
-    }
-    const novas = planToMatches(session.id, [
-      { team_a: duplas[0], team_b: duplas[1], grupo: 0, fase: 4 },
-    ]).map((m) => ({ ...m, round: matches.length + 1 }))
-    await saveSession({ ...session, rounds: matches.length + 1 })
-    await saveMatches(novas)
-    onToast('Final montada 🏆')
+    onToast(`${nomeDaRodada(vivas.length)} montada 🥅`)
   }
 
   function trocar(m: Match, sai: string, entra: string) {
@@ -1296,17 +1283,12 @@ function PlayDetail({
           <button className="btn ghost sm" onClick={() => setShowRank(true)}>🏆 Ranking do dia</button>
           {editable && podeGerarFase2 && (
             <button className="btn marca sm" onClick={() => void gerarFase2()}>
-              🤝 Sortear a fase 2
+              🤝 Sortear o mata-mata
             </button>
           )}
-          {editable && podeGerarSemi && (
-            <button className="btn marca sm" onClick={() => void gerarSemifinal()}>
-              🥅 Montar a semifinal
-            </button>
-          )}
-          {editable && podeGerarFinal && (
-            <button className="btn marca sm" onClick={() => void gerarFinal()}>
-              🏆 Montar a final
+          {editable && podeGerarRodada && (
+            <button className="btn marca sm" onClick={() => void gerarProximaRodada()}>
+              🥅 Montar {rotuloDaProxima.toLowerCase()}
             </button>
           )}
           {editable && (
@@ -1323,17 +1305,26 @@ function PlayDetail({
       {soFase2 && daFase2.length === 0 && (
         <div className="banner info">
           🤝 <strong>Fase de grupos.</strong> Quando todas as partidas dos grupos tiverem placar,
-          toque em <strong>Sortear a fase 2</strong>: cada um ganha uma dupla fixa conforme a
-          colocação no grupo — 1º com 1º de outro grupo, 2º com 2º, e assim por diante.{' '}
-          <strong>Só a fase 2 vale pontos</strong> no pódio do dia.
+          toque em <strong>Sortear o mata-mata</strong>: o melhor 1º forma dupla com o segundo
+          melhor 1º, o terceiro com o quarto, e assim por diante até os últimos. As duplas são
+          fixas, quem perde está fora, e as melhores da fase de grupos podem passar de{' '}
+          <strong>bye</strong>. <strong>Só o mata-mata vale pontos</strong> no pódio do dia.
         </div>
       )}
 
       {soFase2 && daFase2.length > 0 && (
         <div className="banner info">
-          🤝 <strong>Fase 2 em andamento.</strong> As duplas são fixas até o fim, e o pódio do dia
-          sai <strong>apenas destas partidas</strong> — a fase de grupos serviu para formar as
-          duplas.
+          🤝 <strong>{vivas.length > 1 ? nomeDaRodada(vivas.length) : 'Mata-mata encerrado'}.</strong>{' '}
+          {vivas.length > 1 ? (
+            <>
+              {vivas.length} dupla(s) ainda na disputa — quem perde está fora. As duplas são fixas
+              até o fim, e o pódio do dia sai <strong>apenas do mata-mata</strong>.
+            </>
+          ) : (
+            <>
+              Campeãs do dia: <strong>{vivas[0] ? vivas[0].map(nameOf).join(' + ') : '—'}</strong>.
+            </>
+          )}
         </div>
       )}
 

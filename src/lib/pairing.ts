@@ -163,47 +163,62 @@ export function duplasDaFase2(colocacoes: Colocacao[]): Duo[] {
   return duos
 }
 
+/** A menor potencia de 2 que comporta `n`. */
+function tamanhoDaChave(n: number): number {
+  let t = 1
+  while (t < n) t *= 2
+  return t
+}
+
 /**
- * As chaves da fase 2: as duplas, na ordem de forca, divididas em blocos.
+ * Uma rodada do mata-mata das duplas.
  *
- * Cada chave joga so consigo mesma, entao o tamanho decide o tamanho da noite:
- * 2 duplas viram uma final unica (1 jogo por pessoa), 4 viram um rodizio de 6
- * partidas (3 jogos). Nunca menos de 2, senao a chave nao tem partida.
+ * `duos` chega na ordem de forca -- o indice 0 e a dupla mais bem classificada
+ * na fase de grupos. Quem passa de BYE sao as primeiras: ir bem no grupo vale
+ * um atalho. As demais se cruzam pelas pontas (a melhor pega a pior, a segunda
+ * pega a penultima), para as favoritas so se encontrarem no fim.
+ *
+ * O bye so aparece na primeira rodada: dali em diante o numero de duplas ja e
+ * potencia de dois e a conta fecha sozinha.
  */
-export function chavesDaFase2(duos: Duo[], porChave: number): Duo[][] {
-  const alvo = Math.max(2, porChave)
-  const quantas = Math.max(1, Math.round(duos.length / alvo))
-  const base = Math.floor(duos.length / quantas)
-  const resto = duos.length % quantas
-  const out: Duo[][] = []
-  let i = 0
-  for (let c = 0; c < quantas; c++) {
-    const tam = base + (c < resto ? 1 : 0)
-    if (tam > 0) out.push(duos.slice(i, i + tam))
-    i += tam
+export function rodadaDoMataMata(duos: Duo[]): { byes: Duo[]; jogos: [Duo, Duo][] } {
+  if (duos.length <= 1) return { byes: duos, jogos: [] }
+  const byes = tamanhoDaChave(duos.length) - duos.length
+  const passam = duos.slice(0, byes)
+  const jogam = duos.slice(byes)
+  const jogos: [Duo, Duo][] = []
+  for (let i = 0; i < jogam.length / 2; i++) {
+    jogos.push([jogam[i], jogam[jogam.length - 1 - i]])
   }
-  return out.filter((c) => c.length >= 2)
-}
-
-/** Quantas partidas a fase 2 gera, dadas as chaves. */
-export function partidasDaFase2(chaves: Duo[][]): number {
-  return chaves.reduce((t, c) => t + (c.length * (c.length - 1)) / 2, 0)
+  return { byes: passam, jogos }
 }
 
 /**
- * As partidas da fase 2: dentro de cada chave, todas as duplas se enfrentam.
- * `grupo` guarda o numero da CHAVE, para a tela poder agrupar como ja faz.
+ * O nome da rodada, pelo tanto de duplas que SOBRAM depois dela.
+ *
+ * Nomear pelas que entram erraria: com 10 duplas, a primeira rodada tem 6 byes
+ * e so 2 jogos -- ela nao e uma "oitavas", e uma preliminar que corta de 10
+ * para 8.
  */
-export function partidasDasChaves(chaves: Duo[][]): PlannedMatch[] {
-  const out: PlannedMatch[] = []
-  chaves.forEach((chave, ci) => {
-    for (let i = 0; i < chave.length; i++) {
-      for (let j = i + 1; j < chave.length; j++) {
-        out.push({ team_a: chave[i], team_b: chave[j], grupo: ci, fase: 2 })
-      }
-    }
-  })
-  return ordenarFila(out)
+export function nomeDaRodada(entram: number): string {
+  const sobram = tamanhoDaChave(entram) / 2
+  if (entram <= 2) return 'Final'
+  if (sobram === 1) return 'Final'
+  if (sobram === 2) return 'Semifinal'
+  if (sobram === 4) return 'Quartas de final'
+  if (sobram === 8) return 'Oitavas de final'
+  return `Rodada de ${entram} duplas`
+}
+
+/** As duplas que ainda estao vivas: as que nunca perderam, na ordem de forca. */
+export function duplasVivas(duos: Duo[], jogos: Match[]): Duo[] {
+  const chave = (d: readonly string[]) => [...d].sort().join('|')
+  const eliminadas = new Set<string>()
+  for (const m of jogos) {
+    if (m.score_a === null || m.score_b === null) continue
+    eliminadas.add(chave(m.score_a > m.score_b ? m.team_b : m.team_a))
+  }
+  return duos.filter((d) => !eliminadas.has(chave(d)))
 }
 
 export function formarGrupos(
