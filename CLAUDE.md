@@ -127,7 +127,11 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     pronto**: abre o `ResolverCadastro`, que confirma o pagamento ou corrige a
     categoria ali mesmo e já escala. Quase todo bloqueio é cadastro errado, não
     inadimplência — e mandar a pessoa até Jogadores perderia a lista montada.
-    O botão "Todos" também respeita o portão.
+    O botão "Todos" e a **lista colada** também respeitam o portão: da lista, quem
+    está devendo não entra escalado — vai para um aviso amarelo onde cada nome
+    abre o mesmo `ResolverCadastro`. A importação devolve os recém-criados por
+    `onAplicar(ids, criados)` porque o `data` do Play ainda não viu o que ela
+    acabou de gravar, e sem isso um atleta criado na hora escaparia do portão.
 - **Colar a lista do grupo** (`ImportarLista`) serve **duas** telas, com a
   mesma conciliação de nomes e um `modo` diferente: em `play` marca presença no
   play que está sendo montado; em `cadastro` (aba Jogadores) só cria quem falta.

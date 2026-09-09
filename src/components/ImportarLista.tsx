@@ -5,7 +5,12 @@ import { useStore } from '../lib/store'
 import { uid, type Player } from '../lib/types'
 import { Avatar, Modal } from './ui'
 
-type Resultado = { criados: string[]; apelidos: { playerId: string; alias: string }[] }
+type Resultado = {
+  criados: string[]
+  apelidos: { playerId: string; alias: string }[]
+  /** Quantos a tela de destino aceitou, quando ela filtra (o portao do play). */
+  entraram?: number
+}
 
 /**
  * Cola a lista do grupo, casa os nomes com a base, deixa a organizacao
@@ -23,7 +28,13 @@ export default function ImportarLista({
   onToast,
   modo = 'play',
 }: {
-  onAplicar?: (playerIds: string[]) => void
+  /**
+   * Recebe quem a lista escolheu, e os que acabaram de ser criados -- estes
+   * ainda nao chegaram no `data` da tela de destino, entao vao junto para ela
+   * conseguir julgar o cadastro deles. Se devolver um numero, e quantos ela
+   * realmente aceitou.
+   */
+  onAplicar?: (playerIds: string[], criados: Player[]) => number | void
   onClose: () => void
   onToast: (m: string) => void
   modo?: 'play' | 'cadastro'
@@ -82,6 +93,7 @@ export default function ImportarLista({
     if (!itens) return
     const escolhidas: string[] = []
     const criados: string[] = []
+    const novos: Player[] = []
     const apelidos: { playerId: string; alias: string }[] = []
 
     for (const it of itens) {
@@ -106,12 +118,13 @@ export default function ImportarLista({
           pago_avulso: false,
         }
         savePlayer(nova)
+        novos.push(nova)
         escolhidas.push(nova.id)
         criados.push(nova.id)
       }
     }
-    onAplicar?.(escolhidas)
-    setFeito({ criados, apelidos })
+    const entraram = onAplicar?.(escolhidas, novos)
+    setFeito({ criados, apelidos, entraram: typeof entraram === 'number' ? entraram : undefined })
   }
 
   function desfazer() {
@@ -121,7 +134,7 @@ export default function ImportarLista({
       const p = data.players.find((x) => x.id === playerId)
       if (p) savePlayer({ ...p, aliases: (p.aliases ?? []).filter((a) => a !== alias) })
     }
-    onAplicar?.([])
+    onAplicar?.([], [])
     setFeito(null)
     setItens(null)
     onToast('Importação desfeita')
@@ -133,7 +146,10 @@ export default function ImportarLista({
       <Modal title="Lista importada" onClose={onClose}>
         <div className="banner info" style={{ marginTop: 0 }}>
           {modo === 'play' ? (
-            <>✅ <strong>{(itens ?? []).length} jogadores</strong> marcados para este play.</>
+            <>
+              ✅ <strong>{feito.entraram ?? (itens ?? []).length} jogadores</strong> marcados para
+              este play.
+            </>
           ) : (
             <>✅ Conferi <strong>{(itens ?? []).length} nomes</strong> da lista.</>
           )}
@@ -141,6 +157,15 @@ export default function ImportarLista({
             <> {feito.criados.length} {feito.criados.length === 1 ? 'foi criado' : 'foram criados'} agora.</>
           )}
           {modo === 'cadastro' && feito.criados.length === 0 && <> Todos já estavam cadastrados.</>}
+          {modo === 'play' && feito.entraram !== undefined && feito.entraram < (itens ?? []).length && (
+            <>
+              {' '}
+              <strong>
+                {(itens ?? []).length - feito.entraram} ficaram de fora por causa do cadastro
+              </strong>{' '}
+              — o aviso amarelo na tela resolve.
+            </>
+          )}
           {feito.apelidos.length > 0 && <> {feito.apelidos.length} grafia(s) guardada(s) para a próxima vez.</>}
         </div>
         {feito.criados.length > 0 && (

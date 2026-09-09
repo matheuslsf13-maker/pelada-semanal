@@ -314,6 +314,38 @@ function NewPlay({
 
   /** Quem foi tocado mas esta devendo: abre o alerta que resolve na hora. */
   const [pendente, setPendente] = useState<Player | null>(null)
+  /** Quem veio na lista colada mas nao pode entrar ainda. */
+  const [barrados, setBarrados] = useState<string[]>([])
+
+  /**
+   * A lista colada passa pelo mesmo portao do toque na foto.
+   *
+   * Quem esta devendo nao entra escalado -- fica no aviso amarelo, com o mesmo
+   * alerta que confirma o pagamento ou corrige a categoria. Escalar direto
+   * seria o portao existir so para quem monta o play no dedo.
+   *
+   * Os recem-criados chegam por `criados` porque o `data` desta tela ainda nao
+   * viu o que a importacao acabou de gravar.
+   */
+  function aplicarLista(ids: string[], criados: Player[]): number {
+    const novos = new Map(criados.map((p) => [p.id, p]))
+    const liberados: string[] = []
+    const devendo: string[] = []
+    for (const id of ids) {
+      const p = novos.get(id) ?? data.players.find((x) => x.id === id)
+      if (p && !situacaoDoAtleta(p, data).liberado) devendo.push(id)
+      else liberados.push(id)
+    }
+    setSelected(liberados)
+    setBarrados(devendo)
+    return liberados.length
+  }
+
+  /** Resolveu o cadastro: sai do aviso e entra no play. */
+  function liberar(p: Player) {
+    setBarrados((cur) => cur.filter((id) => id !== p.id))
+    setSelected((cur) => (cur.includes(p.id) ? cur : [...cur, p.id]))
+  }
 
   function toggle(id: string) {
     const jogador = data.players.find((p) => p.id === id)
@@ -390,6 +422,44 @@ function NewPlay({
         <button className="btn apoio block sm" style={{ marginTop: 10 }} onClick={() => setImportando(true)}>
           📋 Colar lista de confirmação do grupo
         </button>
+
+        {barrados.length > 0 && (
+          <div className="banner warn" style={{ marginTop: 10 }}>
+            <strong>
+              {barrados.length === 1
+                ? '1 da lista ficou de fora'
+                : `${barrados.length} da lista ficaram de fora`}
+            </strong>{' '}
+            — cadastro a acertar. Toque no nome para confirmar o pagamento ou trocar a categoria.
+            <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>
+              {barrados.map((id) => {
+                const p = data.players.find((x) => x.id === id)
+                if (!p) return null
+                const sit = situacaoDoAtleta(p, data)
+                return (
+                  <button
+                    key={id}
+                    className="chip off"
+                    style={{ borderColor: 'var(--danger)' }}
+                    title={sit.rotulo}
+                    onClick={() => setPendente(p)}
+                  >
+                    <Avatar player={p} size={20} />
+                    {p.nickname?.trim() || p.name}
+                    <span style={{ color: 'var(--danger)' }}>●</span>
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              className="btn ghost sm"
+              style={{ marginTop: 8 }}
+              onClick={() => setBarrados([])}
+            >
+              Deixar todos de fora deste play
+            </button>
+          </div>
+        )}
 
         {available.length === 0 ? (
           <Empty icon="👥">
@@ -695,14 +765,14 @@ function NewPlay({
           onClose={() => setPendente(null)}
           onLiberado={(p) => {
             setPendente(null)
-            setSelected((cur) => (cur.includes(p.id) ? cur : [...cur, p.id]))
+            liberar(p)
           }}
         />
       )}
 
       {importando && (
         <ImportarLista
-          onAplicar={(ids) => setSelected(ids)}
+          onAplicar={aplicarLista}
           onClose={() => setImportando(false)}
           onToast={onToast}
         />
