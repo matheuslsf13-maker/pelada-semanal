@@ -1023,3 +1023,28 @@ textarea.input { line-height: 1.45; }
   font-weight: 800;
   white-space: nowrap;
 }
+
+/* ---------- a barra da forca: distancia da media, para os dois lados ---------- */
+.forca-trilho {
+  position: relative;
+  height: 6px;
+  margin: 4px 0 2px;
+  border-radius: 999px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.forca-meio {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-2);
+}
+.forca-barra {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  opacity: .85;
+}

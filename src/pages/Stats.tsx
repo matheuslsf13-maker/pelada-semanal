@@ -14,12 +14,18 @@ import {
   type DuoStat,
   type PairKeyStat,
 } from '../lib/stats'
+import {
+  JOGOS_PARA_FIRMAR,
+  NIVEIS_DE_FORCA,
+  rankingDeForca,
+  type LinhaDeForca,
+} from '../lib/forca'
 import { matchPoints } from '../lib/scoring'
 import { applyBonuses, computeStreaks, streakLevel, streakValue } from '../lib/streaks'
 import { useStore } from '../lib/store'
 import { dateLabel, monthLabel, monthOf } from '../lib/types'
 
-type Modo = 'jogador' | 'duplas'
+type Modo = 'jogador' | 'duplas' | 'forca'
 
 export default function Stats() {
   const { data } = useStore()
@@ -64,12 +70,16 @@ export default function Stats() {
       <div className="card">
         <div className="segmented">
           <button className={modo === 'jogador' ? 'on' : ''} onClick={() => setModo('jogador')}>
-            👤 Por jogador
+            👤 Jogador
           </button>
           <button className={modo === 'duplas' ? 'on' : ''} onClick={() => setModo('duplas')}>
-            🤝 Por dupla
+            🤝 Dupla
+          </button>
+          <button className={modo === 'forca' ? 'on' : ''} onClick={() => setModo('forca')}>
+            💪 Força
           </button>
         </div>
+        {modo !== 'forca' && (
         <label className="field" style={{ marginTop: 12 }}>
           <span>Período</span>
           <select className="select" value={period} onChange={(e) => setPeriod(e.target.value)}>
@@ -87,9 +97,12 @@ export default function Stats() {
             própria, em que <strong>vencer quem está jogando melhor vale mais</strong>.
           </em>
         </label>
+        )}
       </div>
 
-      {modo === 'jogador' ? (
+      {modo === 'forca' ? (
+        <PainelForca />
+      ) : modo === 'jogador' ? (
         <PainelJogador
           selected={selected}
           setPlayerId={setPlayerId}
@@ -123,6 +136,13 @@ function PainelJogador({
   period: string
 }) {
   const { data, nameOf, playerById } = useStore()
+
+  // a forca e sempre do historico inteiro, mesmo com o periodo filtrado: ela
+  // nao e desempenho do mes, e o que o app aprendeu sobre o atleta ate hoje
+  const forcas = useMemo(() => rankingDeForca(data, nameOf), [data, nameOf])
+  const posicaoNaForca = forcas.findIndex((l) => l.player_id === selected) + 1
+  const minhaForca = posicaoNaForca > 0 ? forcas[posicaoNaForca - 1] : null
+  const totalNaForca = forcas.length
   const partners = useMemo(() => partnerStats(matches), [matches])
   const opponents = useMemo(() => opponentStats(matches), [matches])
 
@@ -182,6 +202,35 @@ function PainelJogador({
           <StatBox k="Saldo" v={balance(s) > 0 ? `+${balance(s)}` : balance(s)} />
           <StatBox k="Games" v={`${s.gamesWon}/${s.gamesLost}`} />
         </div>
+      </div>
+
+      <div className="card">
+        <div className="section-title">💪 Força</div>
+        {minhaForca ? (
+          <>
+            <div className="row" style={{ gap: 10 }}>
+              <span style={{ fontSize: 26 }}>{minhaForca.nivel.emoji}</span>
+              <div className="grow" style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, color: minhaForca.nivel.cor }}>
+                  {minhaForca.nivel.titulo}
+                </div>
+                <div className="tiny muted">
+                  {posicaoNaForca}º mais forte de {totalNaForca}
+                  {minhaForca.provisoria && ' · nota provisória'}
+                </div>
+              </div>
+              <span style={{ fontSize: 24, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                {minhaForca.nota}
+              </span>
+            </div>
+            <p className="tiny muted" style={{ marginBottom: 0, marginTop: 8 }}>
+              Não é o ranking do mês: a força atravessa o ano e mede <strong>com quem</strong>{' '}
+              você ganhou. É ela que monta os grupos e escolhe as duplas. 1500 é a média do grupo.
+            </p>
+          </>
+        ) : (
+          <p className="tiny muted" style={{ margin: 0 }}>Ainda sem partidas para medir.</p>
+        )}
       </div>
 
       <div className="card">
@@ -496,6 +545,124 @@ function TabelaPares({ linhas, primeira }: { linhas: PairKeyStat[]; primeira: st
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+
+/**
+ * O ranking de forca do grupo.
+ *
+ * De proposito sem seletor de periodo: forca nao e desempenho do mes, e o que
+ * o app aprendeu sobre o atleta desde sempre. Filtrar por mes daria um numero
+ * que nao e usado para nada -- o equilibrio das duplas sempre le o total.
+ */
+function PainelForca() {
+  const { data, nameOf, playerById } = useStore()
+  const linhas = useMemo(() => rankingDeForca(data, nameOf), [data, nameOf])
+
+  if (linhas.length === 0) {
+    return (
+      <div className="card">
+        <Empty icon="💪">Registre um play para o app começar a medir a força de cada um.</Empty>
+      </div>
+    )
+  }
+
+  const maior = Math.max(...linhas.map((l) => Math.abs(l.nota - 1500)), 60)
+
+  return (
+    <>
+      <div className="card">
+        <div className="section-title">💪 Força de cada atleta</div>
+        <p className="tiny muted" style={{ marginTop: 0 }}>
+          Esta é a nota que o app já usava por baixo do pano para montar os grupos e escolher as
+          duplas — agora à vista. <strong>Não é o ranking do mês.</strong> O ranking soma pontos e
+          zera todo mês; a força atravessa o ano e mede <strong>com quem</strong> você ganhou:
+          vencer quem está melhor rende muito mais, e vencer apertado rende pouco. 1500 é a média
+          do grupo, e ela não se move — o que um ganha, o outro perde.
+        </p>
+
+        <div className="stack" style={{ gap: 10 }}>
+          {linhas.map((l, i) => (
+            <LinhaDaForca key={l.player_id} linha={l} pos={i + 1} maior={maior} nome={nameOf(l.player_id)} foto={playerById(l.player_id)} />
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="section-title">📏 O que cada nível quer dizer</div>
+        <div className="stack" style={{ gap: 6 }}>
+          {NIVEIS_DE_FORCA.map((n) => (
+            <div key={n.titulo} className="row" style={{ gap: 8 }}>
+              <span style={{ width: 28, textAlign: 'center' }}>{n.emoji}</span>
+              <strong style={{ color: n.cor, minWidth: 130 }}>{n.titulo}</strong>
+              <span className="tiny muted">
+                {n.de === -Infinity
+                  ? 'abaixo de 1425'
+                  : n.de >= 0
+                    ? `de ${1500 + n.de} para cima`
+                    : `a partir de ${1500 + n.de}`}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="tiny muted" style={{ marginBottom: 0 }}>
+          Com menos de {JOGOS_PARA_FIRMAR} partidas a nota aparece como <em>provisória</em>: uma
+          noite ruim ainda mexe demais nela. Quem nunca jogou não entra na lista — a nota dele seria
+          exatamente a média, mas por falta de informação, não por equilíbrio.
+        </p>
+      </div>
+    </>
+  )
+}
+
+function LinhaDaForca({
+  linha,
+  pos,
+  maior,
+  nome,
+  foto,
+}: {
+  linha: LinhaDeForca
+  pos: number
+  maior: number
+  nome: string
+  foto: ReturnType<ReturnType<typeof useStore>['playerById']>
+}) {
+  const dif = linha.nota - 1500
+  // a barra sai do meio para os dois lados: forca e distancia da media, com sinal
+  const largura = (Math.abs(dif) / maior) * 50
+  return (
+    <div>
+      <div className="row" style={{ gap: 8 }}>
+        <span className={`rank-pos top${pos}`} style={{ fontWeight: 800, minWidth: 22 }}>{pos}</span>
+        <Avatar player={foto} size={28} />
+        <span className="grow ellipsis">{nome}</span>
+        <span className="nowrap tiny" style={{ color: linha.nivel.cor, fontWeight: 800 }}>
+          {linha.nivel.emoji} {linha.nivel.titulo}
+        </span>
+        <span className="nowrap" style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+          {linha.nota}
+        </span>
+      </div>
+      <div className="forca-trilho">
+        <div className="forca-meio" />
+        <div
+          className="forca-barra"
+          style={{
+            background: linha.nivel.cor,
+            left: dif >= 0 ? '50%' : `${50 - largura}%`,
+            width: `${Math.max(largura, 1)}%`,
+          }}
+        />
+      </div>
+      <div className="tiny muted">
+        {linha.jogos} {linha.jogos === 1 ? 'partida' : 'partidas'}
+        {linha.provisoria && ' · nota provisória'}
+        {' · '}
+        {dif === 0 ? 'exatamente na média' : dif > 0 ? `+${dif} sobre a média` : `${dif} da média`}
+      </div>
     </div>
   )
 }
