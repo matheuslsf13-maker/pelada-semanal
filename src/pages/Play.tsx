@@ -960,8 +960,9 @@ function descreverFase2(grupos: string[][], duplasMM: number): string {
   let cabe = 1
   while (cabe < duplas) cabe *= 2
   const byes = cabe - duplas
+  // o artigo vem junto do nome: "comeca em a semifinal" nao existe
   const nome =
-    cabe === 2 ? 'a final' : cabe === 4 ? 'a semifinal' : cabe === 8 ? 'as quartas' : `${cabe} duplas`
+    cabe === 2 ? 'na final' : cabe === 4 ? 'na semifinal' : cabe === 8 ? 'nas quartas' : `em ${cabe} duplas`
   const jogos = duplas - 1 // mata-mata: cada jogo elimina uma dupla
 
   return (
@@ -969,7 +970,7 @@ function descreverFase2(grupos: string[][], duplasMM: number): string {
     (foraDoMataMata > 0
       ? ` — os ${foraDoMataMata} piores da fase de grupos ficam de fora.`
       : ' — todo mundo entra.') +
-    ` Começa em ${nome}` +
+    ` Começa ${nome}` +
     (byes > 0 ? `, com ${byes === 1 ? 'uma dupla passando' : `${byes} duplas passando`} de bye.` : '.') +
     ` São ${jogos} jogos até a campeã.`
   )

@@ -20,6 +20,8 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 export default function App() {
   const { loading, error, online, canEdit, userEmail, signIn, signOut, sync, pendingCount } = useStore()
   const [tab, setTab] = useState<Tab>('ranking')
+  /** Aba de Stats pedida por outra tela (o “ver a força” do Ranking). */
+  const [abrirStats, setAbrirStats] = useState<'jogador' | 'duplas' | 'forca' | null>(null)
   const [abrirPlay, setAbrirPlay] = useState<string | null>(null)
   const primeiraRenderizacao = useRef(true)
 
@@ -112,12 +114,13 @@ export default function App() {
             <Ranking
               onToast={show}
               onAbrirPlay={(id) => { setAbrirPlay(id); setTab('play') }}
+              onVerForca={() => { setAbrirStats('forca'); setTab('stats') }}
             />
           )}
           {tab === 'play' && (
             <Play onToast={show} abrir={abrirPlay} onAbriu={() => setAbrirPlay(null)} />
           )}
-          {tab === 'stats' && <Stats />}
+          {tab === 'stats' && <Stats abrir={abrirStats} onAbriu={() => setAbrirStats(null)} />}
           {tab === 'players' && <Players onToast={show} />}
         </main>
       )}

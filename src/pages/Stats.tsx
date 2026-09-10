@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Avatar, Empty, Modal, StatBox } from '../components/ui'
 import {
   avgPoints,
@@ -32,7 +32,7 @@ import { dateLabel, monthLabel, monthOf, plural } from '../lib/types'
 
 type Modo = 'jogador' | 'duplas' | 'forca'
 
-export default function Stats() {
+export default function Stats({ abrir, onAbriu }: { abrir?: Modo | null; onAbriu?: () => void } = {}) {
   const { data } = useStore()
 
   const months = useMemo(() => {
@@ -40,7 +40,14 @@ export default function Stats() {
     return [...set].sort().reverse()
   }, [data.sessions])
 
-  const [modo, setModo] = useState<Modo>('jogador')
+  const [modo, setModo] = useState<Modo>(abrir ?? 'jogador')
+
+  // chegou de outra tela pedindo uma aba especifica (a Força, do Ranking)
+  useEffect(() => {
+    if (!abrir) return
+    setModo(abrir)
+    onAbriu?.()
+  }, [abrir, onAbriu])
   const [period, setPeriod] = useState<string>('all')
   const [playerId, setPlayerId] = useState<string>('')
 

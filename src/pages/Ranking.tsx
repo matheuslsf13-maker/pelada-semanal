@@ -32,6 +32,7 @@ import {
   STREAK_LADDER,
   streakLevel,
 } from '../lib/streaks'
+import { rankingDeForca } from '../lib/forca'
 import { useStore } from '../lib/store'
 import { dateLabel, monthLabel, monthOf, todayISO, type MonthClosure } from '../lib/types'
 
@@ -41,9 +42,12 @@ const HISTORICO = 'all'
 export default function Ranking({
   onToast,
   onAbrirPlay,
+  onVerForca,
 }: {
   onToast: (m: string) => void
   onAbrirPlay?: (sessionId: string) => void
+  /** Leva para a aba Stats ja na Força. */
+  onVerForca?: () => void
 }) {
   const { data, nameOf, playerById, canEdit, saveChoice, saveClosure, deleteClosure } = useStore()
 
@@ -100,7 +104,8 @@ export default function Ranking({
   }, [data, activeMonth, historico, rows.length])
 
   const posicoes = useMemo(() => positionsOf(rows), [rows])
-  const TOPO = 10
+  // cinco basta para saber quem esta na briga; a lista inteira fica a um toque
+  const TOPO = 5
   const visiveis = verTodas ? rows : rows.slice(0, TOPO)
 
   const podium = rows.slice(0, 3)
@@ -333,9 +338,11 @@ export default function Ranking({
         </div>
       )}
 
+      <TopDaForca onVerTudo={onVerForca} />
+
       {rows.length > 0 && (
         <div className="card">
-          <div className="section-title">📊 Classificação completa</div>
+          <div className="section-title">📊 Classificação do mês</div>
           <RankTable rows={visiveis} fire={streaks.current} />
           {rows.length > TOPO && (
             <button className="btn ghost block sm" style={{ marginTop: 10 }} onClick={() => setVerTodas((v) => !v)}>
@@ -522,6 +529,58 @@ export function RankTable({ rows, fire }: { rows: PlayerStat[]; fire?: Map<strin
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+
+/**
+ * Os cinco mais fortes, na tela inicial.
+ *
+ * Nao e o ranking do mes -- o ranking soma pontos e zera na virada, a forca
+ * atravessa o ano e mede COM QUEM voce ganhou. Sao duas leituras diferentes do
+ * grupo, e por isso ficam em cartoes separados, com o aviso no rodape.
+ */
+function TopDaForca({ onVerTudo }: { onVerTudo?: () => void }) {
+  const { data, nameOf, playerById } = useStore()
+  const linhas = useMemo(() => rankingDeForca(data, nameOf), [data, nameOf])
+  if (linhas.length === 0) return null
+
+  const topo = linhas.slice(0, 5)
+  return (
+    <div className="card">
+      <div className="section-title">💪 Força do grupo</div>
+      <div className="stack" style={{ gap: 8 }}>
+        {topo.map((l, i) => (
+          <div key={l.player_id} className="row" style={{ gap: 8 }}>
+            <span className={`rank-pos top${i + 1}`} style={{ fontWeight: 800, minWidth: 22 }}>
+              {i + 1}
+            </span>
+            <Avatar player={playerById(l.player_id)} size={28} />
+            <span className="grow ellipsis">{nameOf(l.player_id)}</span>
+            <span className="nowrap tiny" style={{ color: l.nivel.cor, fontWeight: 800 }}>
+              {l.nivel.emoji} {l.nivel.titulo}
+            </span>
+            <span
+              className="nowrap"
+              style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}
+            >
+              {l.nota}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {linhas.length > 5 && onVerTudo && (
+        <button className="btn ghost block sm" style={{ marginTop: 10 }} onClick={onVerTudo}>
+          Ver a força dos {linhas.length} jogadores →
+        </button>
+      )}
+
+      <p className="tiny muted" style={{ marginTop: 8, marginBottom: 0 }}>
+        Não é o ranking do mês: a força atravessa o ano e mede <strong>com quem</strong> você
+        ganhou. É ela que monta os grupos e escolhe as duplas. 1500 é a média do grupo.
+      </p>
     </div>
   )
 }
