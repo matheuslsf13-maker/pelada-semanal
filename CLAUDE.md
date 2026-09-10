@@ -50,20 +50,22 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
 - Partida até 4 games. Pontos = games do vencedor − do perdedor (mínimo 1).
   Quem perde não pontua.
 - **O empate no fim é configurável** (`sessions.desempate`, `src/lib/desempate.ts`).
-  São **duas perguntas encadeadas**, e a `Regra` guarda as duas num campo só
-  (`nenhum`, `vantagem`, `tie7`, `vantagem-tie10v2`…) para caber também num
-  seletor por fase:
-  - **No `alvo-1`x`alvo-1`** (o 3x3): quem chegar ao alvo leva · vai a 2 · tie de
-    7 · super tie de 10.
-  - **No `alvo`x`alvo`**, e só quando a primeira foi *vai a 2*: segue até abrir
-    dois (sem teto) · tie de 7 · super tie. É o modelo do organizador: numa
-    partida de 6, o 5x5 vai a 2 e fecha em 7x5, e o 6x6 vai para o tie e fecha
-    em 7x6.
-  - `tieVai2` diz que o **tie** também só fecha com 2 pontos de diferença.
-  **Só a `vantagem` muda o que dá para lançar**, porque é a única em que o
-  vencedor passa do alvo; os botões do placar passam a mostrar o placar inteiro
-  (5x3, 7x5, 7x6). Com tie o placar em games não muda — o tie decide o game que
-  fecha —, então ali a configuração só muda a regra anunciada na tela.
+  São **três modos**, e o que muda é o que acontece no `alvo-1`x`alvo-1` (o 3x3):
+  - `alvo` — quem chegar ao alvo primeiro leva; 3x3 vira 4x3.
+  - `vantagem` — “só vai a 2”: segue até abrir dois games, **sem teto**.
+  - `vantagem-tie7` / `vantagem-tie10` — vai a 2 até o `alvo`x`alvo`, e dali um
+    tie decide. Numa partida de 6: 5x5 fecha em 7x5, 6x6 vai ao tie e fica 7x6.
+    É o **único modo com teto** — o “vai a 2” puro pode se arrastar e travar a
+    quadra.
+  **O tie sempre vai a 2** (7x5 vale, 7x6 não). Não existe opção para isso: é como
+  o grupo joga, e é uma pergunta a menos na tela. O que se escolhe é o tamanho,
+  7 ou 10. `lerRegra` ainda entende os valores que versões anteriores gravaram
+  (`tie7`, `tie7v2`, `vantagem-tie10v2`…), então nenhum play migra; um play
+  gravado com o tie caindo **direto** no 3x3 continua sendo lido e explicado
+  certo (`tieDireto`), só não dá mais para escolher isso.
+  **Só a vantagem muda o que dá para lançar**, porque é a única em que o vencedor
+  passa do alvo; os botões do placar passam a mostrar o placar inteiro (5x3,
+  7x5, 7x6). O tie decide o game que fecha, então nunca aparece no placar.
   **No `grupos-duplas` a regra é por fase** (`sessions.desempates`, mesma conta
   do `alvos`): o seletor fica embaixo dos games de cada fase, então os grupos
   podem fechar no 4 seco e a final ir a 2.

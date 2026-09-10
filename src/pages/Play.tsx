@@ -37,20 +37,19 @@ import {
   type PlayerStat,
 } from '../lib/stats'
 import {
+  MODOS,
   OPCOES_DE_FASE,
-  OPCOES_NO_EMPATE,
-  OPCOES_NO_TETO,
   REGRA_PADRAO,
+  TIES,
   escreverRegra,
   explicarRegra,
   gamesDoPerdedor,
   gamesDoVencedor,
   lerRegra,
   resumoDaFase,
-  temTie,
-  type NoEmpate,
-  type NoTeto,
+  type Modo,
   type Regra,
+  type Tie,
 } from '../lib/desempate'
 import { computeStreaks, podiosDoDia, streakLevel, vagasDoPodio } from '../lib/streaks'
 import {
@@ -429,7 +428,8 @@ function NewPlay({
         rounds: fila.length, // a coluna se chama rounds; hoje e o total de partidas
         target,
         desempate: escreverRegra(regra),
-        desempate_vai2: regra.tieVai2,
+        // o tie sempre vai a 2; a coluna fica no banco so para os plays antigos
+        desempate_vai2: true,
         player_ids: selected,
         status: 'open',
         created_at: new Date().toISOString(),
@@ -615,29 +615,29 @@ function NewPlay({
             <div className="field">
               <span>No {target - 1}x{target - 1}</span>
               <div className="row wrap" style={{ gap: 6 }}>
-                {OPCOES_NO_EMPATE.map((d) => (
+                {MODOS.map((d) => (
                   <button
                     key={d.valor}
-                    className={`chip ${regra.no1 === d.valor ? 'on' : 'off'}`}
+                    className={`chip ${regra.modo === d.valor ? 'on' : 'off'}`}
                     style={{ flex: 'none' }}
-                    onClick={() => setRegra((r) => ({ ...r, no1: d.valor as NoEmpate }))}
+                    onClick={() => setRegra((r) => ({ ...r, modo: d.valor as Modo }))}
                   >
                     {d.rotulo}
                   </button>
                 ))}
               </div>
 
-              {/* a segunda pergunta so existe quando o jogo pode chegar la */}
-              {regra.no1 === 'vantagem' && (
+              {/* o tamanho do tie so importa quando existe tie */}
+              {regra.modo === 'vantagem-tie' && (
                 <>
-                  <span style={{ marginTop: 12 }}>E se chegar a {target}x{target}</span>
+                  <span style={{ marginTop: 12 }}>O tie do {target}x{target} é de</span>
                   <div className="row wrap" style={{ gap: 6 }}>
-                    {OPCOES_NO_TETO.map((d) => (
+                    {TIES.map((d) => (
                       <button
                         key={d.valor}
-                        className={`chip ${regra.teto === d.valor ? 'on' : 'off'}`}
+                        className={`chip ${regra.tie === d.valor ? 'on' : 'off'}`}
                         style={{ flex: 'none' }}
-                        onClick={() => setRegra((r) => ({ ...r, teto: d.valor as NoTeto }))}
+                        onClick={() => setRegra((r) => ({ ...r, tie: d.valor as Tie }))}
                       >
                         {d.rotulo}
                       </button>
@@ -647,24 +647,6 @@ function NewPlay({
               )}
 
               <em className="hint" style={{ marginTop: 6 }}>{explicarRegra(target, regra)}</em>
-
-              {temTie(regra) && (
-                <label className="switch" style={{ marginTop: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={regra.tieVai2}
-                    onChange={(e) => setRegra((r) => ({ ...r, tieVai2: e.target.checked }))}
-                  />
-                  <span>
-                    <strong>O tie também vai a 2</strong>
-                    <span className="tiny muted">
-                      {regra.tieVai2
-                        ? 'o tie só fecha com dois pontos de diferença — 7x5 sim, 7x6 não'
-                        : 'quem chegar primeiro na pontuação do tie leva, mesmo por um ponto'}
-                    </span>
-                  </span>
-                </label>
-              )}
             </div>
           )}
 
@@ -2137,7 +2119,7 @@ function MatchCard({
         </div>
         <div className="team win">
           <Duo ids={winner === 'a' ? match.team_a : match.team_b} />
-          <span className="score-box">{desempate.no1 === 'vantagem' ? `${target}+` : target}</span>
+          <span className="score-box">{desempate.modo !== 'alvo' && !desempate.tieDireto ? `${target}+` : target}</span>
         </div>
         <div className="ask">Quantos games <strong>{nameOf(loserIds[0])} + {nameOf(loserIds[1])}</strong> fez?</div>
         <div className="games-row">
