@@ -45,11 +45,15 @@ import {
   escreverRegra,
   explicarRegra,
   decidiuNoTie,
+  explicarGamesInvalido,
+  explicarTieInvalido,
   gamesDoPerdedor,
   gamesDoVencedor,
   placarDoTie,
+  placarDeGamesValido,
   pontosDoPerdedorNoTie,
   pontosDoVencedorNoTie,
+  tieValido,
   lerRegra,
   resumoDaFase,
   type Modo,
@@ -2078,6 +2082,8 @@ function MatchCard({
   const [winner, setWinner] = useState<'a' | 'b' | null>(null)
   /** Escolheu o placar em games decidido no tie; falta o placar do tie. */
   const [noTie, setNoTie] = useState<{ venceu: number; perdeu: number } | null>(null)
+  /** Abriu os campos para digitar um placar que os botoes nao cobrem. */
+  const [digitando, setDigitando] = useState(false)
   const [trocando, setTrocando] = useState(false)
   const noTime = jogadoresDaPartida(match)
   // com um grupo so a cor nao diz nada; com varios e o que identifica a quadra
@@ -2155,7 +2161,26 @@ function MatchCard({
                 : placarDoTie(desempate, p)}
             </button>
           ))}
+          <button className="game-btn manual" onClick={() => setDigitando(true)}>✏️</button>
         </div>
+
+        {digitando && (
+          <PlacarManual
+            vencedora="Venceu o tie"
+            perdedora="Perdeu o tie"
+            valida={(a, b) => tieValido(desempate, a, b)}
+            explica={(a, b) => explicarTieInvalido(desempate, a, b)}
+            onCancelar={() => setDigitando(false)}
+            onConfirmar={(_v, perdeu) => {
+              const a = winner === 'a' ? noTie.venceu : noTie.perdeu
+              const b = winner === 'a' ? noTie.perdeu : noTie.venceu
+              setDigitando(false)
+              setNoTie(null)
+              setWinner(null)
+              onScore(match, a, b, perdeu)
+            }}
+          />
+        )}
       </div>
     )
   }
@@ -2205,7 +2230,26 @@ function MatchCard({
               </button>
             )
           })}
+          {desempate.modo === 'vantagem' && (
+            <button className="game-btn manual" onClick={() => setDigitando(true)}>✏️</button>
+          )}
         </div>
+
+        {digitando && (
+          <PlacarManual
+            vencedora={(winner === 'a' ? match.team_a : match.team_b).map(nameOf).join(' + ')}
+            perdedora={loserIds.map(nameOf).join(' + ')}
+            valida={(a, b) => placarDeGamesValido(target, desempate, a, b)}
+            explica={(a, b) => explicarGamesInvalido(target, desempate, a, b)}
+            onCancelar={() => setDigitando(false)}
+            onConfirmar={(venceu, perdeu) => {
+              setDigitando(false)
+              setWinner(null)
+              if (winner === 'a') onScore(match, venceu, perdeu)
+              else onScore(match, perdeu, venceu)
+            }}
+          />
+        )}
       </div>
     )
   }
@@ -2413,6 +2457,7 @@ function CorrigirPlacar({
   const { nameOf } = useStore()
   const [winner, setWinner] = useState<'a' | 'b' | null>(null)
   const [noTie, setNoTie] = useState<{ venceu: number; perdeu: number } | null>(null)
+  const [digitando, setDigitando] = useState(false)
 
   // o tie tem placar proprio, entao ele e um passo a parte tambem aqui
   if (winner && noTie) {
@@ -2440,7 +2485,23 @@ function CorrigirPlacar({
               {pontosDoVencedorNoTie(desempate, p) === desempate.tie ? p : placarDoTie(desempate, p)}
             </button>
           ))}
+          <button className="game-btn manual" onClick={() => setDigitando(true)}>✏️</button>
         </div>
+
+        {digitando && (
+          <PlacarManual
+            vencedora="Venceu o tie"
+            perdedora="Perdeu o tie"
+            valida={(a, b) => tieValido(desempate, a, b)}
+            explica={(a, b) => explicarTieInvalido(desempate, a, b)}
+            onCancelar={() => setDigitando(false)}
+            onConfirmar={(_v, perdeu) =>
+              winner === 'a'
+                ? onScore(noTie.venceu, noTie.perdeu, perdeu)
+                : onScore(noTie.perdeu, noTie.venceu, perdeu)
+            }
+          />
+        )}
       </Modal>
     )
   }
@@ -2479,7 +2540,23 @@ function CorrigirPlacar({
             </button>
             )
           })}
+          {desempate.modo === 'vantagem' && (
+            <button className="game-btn manual" onClick={() => setDigitando(true)}>✏️</button>
+          )}
         </div>
+
+        {digitando && (
+          <PlacarManual
+            vencedora={(winner === 'a' ? match.team_a : match.team_b).map(nameOf).join(' + ')}
+            perdedora={perdedors.map(nameOf).join(' + ')}
+            valida={(a, b) => placarDeGamesValido(target, desempate, a, b)}
+            explica={(a, b) => explicarGamesInvalido(target, desempate, a, b)}
+            onCancelar={() => setDigitando(false)}
+            onConfirmar={(venceu, perdeu) =>
+              winner === 'a' ? onScore(venceu, perdeu) : onScore(perdeu, venceu)
+            }
+          />
+        )}
       </Modal>
     )
   }
@@ -2790,5 +2867,85 @@ function DuplasDoDia({ partidas }: { partidas: Match[] }) {
         partidas —, e é por isso que a dupla é a medida do dia aqui.
       </p>
     </>
+  )
+}
+
+
+/**
+ * Placar digitado na mao, para o que os botoes nao cobrem.
+ *
+ * A conferencia nao e enfeite: um placar impossivel (um 8x5 num tie de 7)
+ * entraria no ranking e no calculo de forca como se fosse real, e ninguem
+ * notaria depois. Por isso o botao so libera quando o placar fecha com a
+ * regra, e a frase diz qual seria o certo.
+ */
+function PlacarManual({
+  vencedora,
+  perdedora,
+  valida,
+  explica,
+  onConfirmar,
+  onCancelar,
+}: {
+  vencedora: string
+  perdedora: string
+  valida: (a: number, b: number) => boolean
+  explica: (a: number, b: number) => string | null
+  onConfirmar: (doVencedor: number, doPerdedor: number) => void
+  onCancelar: () => void
+}) {
+  const [aTexto, setA] = useState('')
+  const [bTexto, setB] = useState('')
+  const a = Number(aTexto)
+  const b = Number(bTexto)
+  const preenchido = aTexto.trim() !== '' && bTexto.trim() !== ''
+  const ok = preenchido && valida(a, b)
+  const erro = preenchido ? explica(a, b) : null
+
+  return (
+    <div className="placar-manual">
+      <div className="row" style={{ gap: 8 }}>
+        <label className="field grow" style={{ marginBottom: 0 }}>
+          <span className="ellipsis">{vencedora}</span>
+          <input
+            className="input"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={aTexto}
+            autoFocus
+            onChange={(e) => setA(e.target.value)}
+          />
+        </label>
+        <label className="field grow" style={{ marginBottom: 0 }}>
+          <span className="ellipsis">{perdedora}</span>
+          <input
+            className="input"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={bTexto}
+            onChange={(e) => setB(e.target.value)}
+          />
+        </label>
+      </div>
+
+      {erro && (
+        <p className="tiny" style={{ color: 'var(--danger)', marginTop: 8, marginBottom: 0 }}>
+          {erro}
+        </p>
+      )}
+
+      <div className="row" style={{ gap: 8, marginTop: 10 }}>
+        <button className="btn ghost grow sm" onClick={onCancelar}>Cancelar</button>
+        <button
+          className="btn marca grow sm"
+          disabled={!ok}
+          onClick={() => onConfirmar(a, b)}
+        >
+          Confirmar {ok ? `${a}x${b}` : ''}
+        </button>
+      </div>
+    </div>
   )
 }

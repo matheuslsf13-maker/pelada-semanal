@@ -1174,3 +1174,15 @@ textarea.input { line-height: 1.45; }
   font-weight: 800;
 }
 .tie-tag { color: var(--ouro); font-weight: 800; }
+
+
+/* placar digitado na mao, quando os botoes nao cobrem */
+.placar-manual {
+  border: 1px dashed var(--line-2);
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 10px;
+  background: var(--card-2);
+}
+.placar-manual .field > span { font-size: 10.5px; }
+.game-btn.manual { border-style: dashed; }

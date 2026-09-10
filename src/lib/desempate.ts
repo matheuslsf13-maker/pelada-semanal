@@ -210,3 +210,66 @@ export function pontosDoPerdedorNoTie(r: Regra): number[] {
 export function placarDoTie(r: Regra, doPerdedor: number): string {
   return `${pontosDoVencedorNoTie(r, doPerdedor)}x${doPerdedor}`
 }
+
+/* -------------------------------------------------------------------------
+   PLACAR DIGITADO NA MAO
+
+   Os botoes cobrem o que acontece quase sempre, mas o "vai a 2" nao tem
+   limite: um tie pode chegar a 20x18. Em vez de esticar a lista de botoes ate
+   o absurdo, a tela deixa digitar -- e confere.
+
+   A conferencia sai de graca porque a regra ja mora aqui: um placar e
+   possivel se ele e EXATAMENTE o que a regra produz para aquele numero do
+   perdedor. Nao ha uma segunda copia da regra para desencontrar da primeira.
+   ------------------------------------------------------------------------- */
+
+/** Este placar em games pode ter acontecido com esta regra? */
+export function placarDeGamesValido(alvo: number, r: Regra, a: number, b: number): boolean {
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return false
+  if (a === b) return false
+  const [venceu, perdeu] = a > b ? [a, b] : [b, a]
+  return gamesDoVencedor(alvo, r, perdeu) === venceu
+}
+
+/** Por que este placar em games nao pode ter acontecido. Null quando pode. */
+export function explicarGamesInvalido(alvo: number, r: Regra, a: number, b: number): string | null {
+  if (placarDeGamesValido(alvo, r, a, b)) return null
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return 'Digite os dois placares.'
+  if (a === b) return 'A partida não termina empatada.'
+  const [venceu, perdeu] = a > b ? [a, b] : [b, a]
+  const certo = gamesDoVencedor(alvo, r, perdeu)
+  if (r.modo === 'alvo') return `Com esta regra a partida fecha em ${alvo}: seria ${alvo}x${perdeu}.`
+  if (temTeto(r) && perdeu > alvo) {
+    return `Com o tie, a partida não passa de ${alvo + 1}x${alvo}.`
+  }
+  // abaixo do limite o motivo nao e a vantagem: e que aquele numero do
+  // perdedor simplesmente da outro placar
+  if (perdeu <= alvo - 2) return `Com ${perdeu} do perdedor, a partida fecha em ${certo}x${perdeu}.`
+  if (venceu > alvo && venceu - perdeu !== 2) {
+    return `A partir do ${alvo - 1}x${alvo - 1} só fecha com dois games de diferença: seria ${certo}x${perdeu}.`
+  }
+  return `Com ${perdeu} do perdedor, a partida fecha em ${certo}x${perdeu}.`
+}
+
+/** Este placar de tie pode ter acontecido? */
+export function tieValido(r: Regra, a: number, b: number): boolean {
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return false
+  if (a === b) return false
+  const [venceu, perdeu] = a > b ? [a, b] : [b, a]
+  return pontosDoVencedorNoTie(r, perdeu) === venceu
+}
+
+/** Por que este placar de tie nao pode ter acontecido. Null quando pode. */
+export function explicarTieInvalido(r: Regra, a: number, b: number): string | null {
+  if (tieValido(r, a, b)) return null
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) return 'Digite os dois placares.'
+  if (a === b) return 'O tie não termina empatado.'
+  const [venceu, perdeu] = a > b ? [a, b] : [b, a]
+  if (venceu < r.tie) return `O tie vai até ${r.tie}: o vencedor fez pelo menos ${r.tie}.`
+  const certo = pontosDoVencedorNoTie(r, perdeu)
+  if (perdeu <= r.tie - 2) return `Com ${perdeu} do perdedor, o tie fecha em ${certo}x${perdeu}.`
+  if (venceu > r.tie) {
+    return `A partir do ${r.tie - 1}x${r.tie - 1} o tie só fecha com dois pontos de diferença: seria ${certo}x${perdeu}.`
+  }
+  return `Com ${perdeu} do perdedor, o tie fecha em ${certo}x${perdeu}.`
+}
