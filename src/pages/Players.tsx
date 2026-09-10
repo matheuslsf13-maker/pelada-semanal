@@ -13,6 +13,8 @@ import {
   type Categoria,
 } from '../lib/mensalidade'
 import { useStore } from '../lib/store'
+import { avisosDoBanco } from '../data/supabaseRepo'
+import { hasSupabase } from '../lib/supabase'
 import { jogadoresDaPartida } from '../lib/pairing'
 import { plural, uid, type Player } from '../lib/types'
 
@@ -35,6 +37,18 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
     }
     return m
   }, [data])
+
+  /**
+   * O banco ainda nao tem as colunas de pagamento?
+   *
+   * Com `players` carregado e NENHUM atleta trazendo `categoria`, a coluna nao
+   * existe la -- quando existe, ela vem preenchida pelo default. Sem aviso,
+   * confirmar pagamento parecia funcionar e desfazia sozinho na leitura
+   * seguinte: o app salva, o banco descarta o que nao conhece.
+   */
+  const semColunaDePagamento =
+    (hasSupabase && data.players.length > 0 && data.players.every((p) => p.categoria === undefined)) ||
+    avisosDoBanco.pagamento
 
   const sorted = [...data.players].sort(
     (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'),
@@ -140,6 +154,15 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
           onClose={() => setImportando(false)}
           onToast={onToast}
         />
+      )}
+
+      {semColunaDePagamento && (
+        <div className="banner warn">
+          ⚠️ <strong>O banco ainda não tem as colunas de pagamento.</strong> Até rodar o
+          script <strong>09-categorias-pagamento.sql</strong> no Supabase, confirmar pagamento não
+          fica guardado: o app salva e o banco descarta o que não conhece. O resto do app funciona
+          normalmente.
+        </div>
       )}
 
       {editando && (

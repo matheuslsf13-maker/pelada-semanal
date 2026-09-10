@@ -2,6 +2,15 @@ import { supabase } from '../lib/supabase'
 import type { AppData, Match, MonthClosure, PlaySession, Player, StreakChoice } from '../lib/types'
 import type { Repo } from './repo'
 
+/**
+ * Algo nao coube no banco porque uma migracao ainda nao rodou.
+ *
+ * Nao e reativo de proposito: quem le e a aba de atletas, que re-renderiza
+ * a cada escrita -- entao o aviso aparece exatamente quando a tentativa
+ * acontece, que e a hora em que ele importa.
+ */
+export const avisosDoBanco = { pagamento: false }
+
 function client() {
   if (!supabase) throw new Error('Supabase nao configurado')
   return supabase
@@ -38,6 +47,11 @@ export const supabaseRepo: Repo = {
     // banco ainda sem a coluna do apelido (script 07 nao rodou): salva o resto,
     // para nao travar o cadastro de quem ainda nao migrou
     if (/nickname|categoria|pago_mes|pago_avulso/.test(error.message ?? '')) {
+      // o banco nao conhece (ou nao aceita) a coluna: salva o resto, mas
+      // marca, para a tela avisar em vez de o pagamento sumir calado
+      if (/categoria|pago_mes|pago_avulso/.test(error.message ?? '')) {
+        avisosDoBanco.pagamento = true
+      }
       const {
         nickname: _apelido,
         categoria: _cat,
