@@ -83,7 +83,7 @@ export default function App() {
 
       {pendingCount > 0 ? (
         <div className="banner warn">
-          📶 Sem conexão no momento — <strong>{pendingCount} alteração(ões)</strong> guardada(s) no celular.
+          📶 Sem conexão no momento — <strong>{pendingCount === 1 ? 'uma alteração guardada' : `${pendingCount} alterações guardadas`}</strong> no celular.
           Pode continuar lançando: assim que o sinal voltar eu envio tudo sozinho.
         </div>
       ) : (

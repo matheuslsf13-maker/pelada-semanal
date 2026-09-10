@@ -133,11 +133,11 @@ export default function Ranking({
       )}
 
       <div className="card">
-        <div className="row spread">
-          <div className="section-title" style={{ margin: 0 }}>
-            {historico ? '🏆 Ranking geral' : '🏆 Ranking do mês'}
-          </div>
-          <select className="select" style={{ width: 'auto' }} value={periodo} onChange={(e) => setMonth(e.target.value)}>
+        <div className="section-title" style={{ marginTop: 0 }}>
+          {historico ? '🏆 Ranking geral' : '🏆 Ranking do mês'}
+        </div>
+        <div>
+          <select className="select" value={periodo} onChange={(e) => setMonth(e.target.value)}>
             {months.map((m) => (
               <option key={m} value={m}>{monthLabel(m)}</option>
             ))}
@@ -273,7 +273,7 @@ export default function Ranking({
           <p className="tiny muted" style={{ marginTop: 0 }}>
             Estas jogadores fecharam o mês com status. Pergunte a cada um: <strong>usar</strong> o
             status agora (os pontos entram neste mês e a sequência zera) ou <strong>preservar</strong>
-            {' '}(não pontua, o status continua crescendo no mês que vem e ela ganha <strong>1 vida</strong>)?
+            {' '}(não pontua, o status continua crescendo no mês que vem e ele ganha <strong>1 vida</strong>)?
             Sem resposta, o status fica preservado.
           </p>
           <div className="stack">
@@ -366,7 +366,7 @@ export default function Ranking({
           ))}
         </div>
         <p className="small" style={{ color: 'var(--muted)' }}>
-          Cada partida vai até 4 pontos, sem empate. Quem vence leva os pontos da tabela; a derrota não pontua.
+          Quem vence leva os pontos da tabela; a derrota não pontua — e a diferença é em games.
           Ao final do play, os pontos são somados ao ranking mensal.
         </p>
         <hr className="sep" style={{ borderColor: 'rgba(255,255,255,.15)' }} />
@@ -401,9 +401,9 @@ export default function Ranking({
         <p className="tiny" style={{ color: 'var(--muted)', marginBottom: 0 }}>
           <strong>No fechamento do mês ele escolhe:</strong> <em>usar</em> o status (os pontos entram
           naquele mês e a sequência zera) ou <em>preservar</em> (não pontua, o status continua
-          crescendo e ela ganha <strong>1 vida</strong>, que segura um play fora do pódio).
+          crescendo e ele ganha <strong>1 vida</strong>, que segura um play fora do pódio).
           Faltar zera o status mesmo com vida — tem que estar lá. Como o mês tem 4 ou 5 plays,
-          Imperatriz e Craque só existem para quem preserva e atravessa meses.
+          Imperador e Craque só existem para quem preserva e atravessa meses.
         </p>
       </div>
     </>
@@ -442,7 +442,7 @@ function ConfirmarFechamento({
       ) : (
         <>
           <div className="section-title" style={{ fontSize: 13 }}>
-            🔥 {emChamas.length} jogador(s) fecham com status
+            🔥 {emChamas.length === 1 ? 'Um jogador fecha' : `${emChamas.length} jogadores fecham`} com status
           </div>
           <div className="stack">
             {emChamas.map((f) => {

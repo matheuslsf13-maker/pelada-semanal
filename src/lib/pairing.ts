@@ -11,7 +11,7 @@ import { uid } from './types'
  * cada quadra que vaga, escolhe da fila a partida cujos jogadores estao livres
  * e estao fora ha mais tempo (ver `proximasDasQuadras`).
  *
- * A fila cobre o rodizio completo: cada jogador faz dupla com cada um das
+ * A fila cobre o rodizio completo: cada jogador faz dupla com cada um dos
  * outras exatamente uma vez. No modo em grupos, esse mesmo rodizio acontece
  * dentro de cada grupo -- os pontos continuam individuais e o ranking do dia
  * e unico.
@@ -253,7 +253,7 @@ export function quadrasSimultaneas(tamanhos: number[]): number {
 }
 
 /**
- * Quantas duplas cada jogador precisa REPETIR para todas jogarem o mesmo
+ * Quantas duplas cada jogador precisa REPETIR para todos jogarem o mesmo
  * tanto.
  *
  * Todos com todos uma vez da n(n-1)/2 duplas, e cada partida gasta duas delas.
@@ -515,7 +515,7 @@ function umRodizio(ids: string[], ctx: Contexto): Partida[] {
     if (pares.length % 2 === 1) {
       // Sobra uma dupla desta ronda. A escolhida e a que menos repete
       // jogadores ja presentes nos outros sobras: se todas as sobras caem em
-      // cima da mesmo jogador elas nao conseguem se enfrentar depois e viram
+      // cima do mesmo jogador elas nao conseguem se enfrentar depois e viram
       // duplas sem adversaria.
       sobras.push(...pares.splice(menosRepetida(pares, sobras), 1))
     }
@@ -872,7 +872,7 @@ export type EscolhaOpts = {
  *
  * Escolhe o CONJUNTO de partidas de uma vez, nao uma quadra por vez: pegando
  * a melhor partida para a quadra 1 sem olhar os outros, sobra jogador
- * repetida entre duas quadras (a mesmo jogador nao pode entrar em duas ao
+ * repetido entre duas quadras (o mesmo jogador nao pode entrar em duas ao
  * mesmo tempo). Aqui a busca preenche o maior numero de quadras possivel e,
  * entre as opcoes que preenchem o mesmo tanto, escolhe a de menor custo.
  *

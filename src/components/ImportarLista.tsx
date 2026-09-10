@@ -166,7 +166,7 @@ export default function ImportarLista({
               — o aviso amarelo na tela resolve.
             </>
           )}
-          {feito.apelidos.length > 0 && <> {feito.apelidos.length} grafia(s) guardada(s) para a próxima vez.</>}
+          {feito.apelidos.length > 0 && <> {feito.apelidos.length === 1 ? 'uma grafia guardada' : `${feito.apelidos.length} grafias guardadas`} para a próxima vez.</>}
         </div>
         {feito.criados.length > 0 && (
           <>

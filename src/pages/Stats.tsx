@@ -23,7 +23,7 @@ import {
 import { matchPoints } from '../lib/scoring'
 import { applyBonuses, computeStreaks, streakLevel, streakValue } from '../lib/streaks'
 import { useStore } from '../lib/store'
-import { dateLabel, monthLabel, monthOf } from '../lib/types'
+import { dateLabel, monthLabel, monthOf, plural } from '../lib/types'
 
 type Modo = 'jogador' | 'duplas' | 'forca'
 
@@ -184,7 +184,7 @@ function PainelJogador({
           <div className="grow">
             <div style={{ fontSize: 19, fontWeight: 800 }} className="ellipsis">{nameOf(selected)}</div>
             <div className="small muted">
-              {s.days} play(s) · {avgPoints(s).toFixed(2)} pontos por partida
+              {plural(s.days, 'play')} · {avgPoints(s).toFixed(2)} pontos por partida
             </div>
             {nivel && (
               <div className="tiny" style={{ color: 'var(--marca)', fontWeight: 800, marginTop: 2 }}>

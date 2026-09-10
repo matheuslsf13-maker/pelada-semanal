@@ -14,7 +14,7 @@ import {
 } from '../lib/mensalidade'
 import { useStore } from '../lib/store'
 import { jogadoresDaPartida } from '../lib/pairing'
-import { uid, type Player } from '../lib/types'
+import { plural, uid, type Player } from '../lib/types'
 
 export default function Players({ onToast }: { onToast: (m: string) => void }) {
   const { data, savePlayer, deletePlayer, mergePlayers, canEdit, repo } = useStore()
@@ -167,13 +167,14 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
       )}
 
       <div className="card">
-        <div className="section-title">👥 Jogadores ({data.players.filter((p) => p.active).length} ativas)</div>
+        <div className="section-title">👥 Jogadores ({data.players.filter((p) => p.active).length} ativos)</div>
         {sorted.length === 0 ? (
           <Empty icon="👥">Cadastre os jogadores do grupo para começar.</Empty>
         ) : (
           <div className="stack">
             {sorted.map((p) => (
-              <div key={p.id} className="row" style={{ opacity: p.active ? 1 : 0.5 }}>
+              <div key={p.id} className="atleta-linha" style={{ opacity: p.active ? 1 : 0.5 }}>
+                <div className="row">
                 <button
                   className="avatar"
                   title="Trocar foto"
@@ -210,25 +211,22 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
                       </div>
                     )
                   })()}
-                  <div className="tiny muted">
+                  <div className="tiny muted acoes-atleta">
                     {busy === p.id ? (
                       'salvando foto…'
                     ) : (
                       <>
-                        {p.active ? 'ativo' : 'inativo'}
+                        {!p.active && <span className="pausado">pausado</span>}
                         {canEdit && (
                           <>
-                            {' · '}
                             <button className="linkish" onClick={() => setEditando(p)}>
                               editar perfil
                             </button>
-                            {' · '}
                             <button className="linkish" onClick={() => fileRefs.current[p.id]?.click()}>
                               {p.photo_url ? 'trocar foto' : 'pôr foto'}
                             </button>
                             {p.photo_url && (
                               <>
-                                {' · '}
                                 <button className="linkish" onClick={() => void removePhoto(p)}>
                                   remover foto
                                 </button>
@@ -240,8 +238,11 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
                     )}
                   </div>
                 </div>
+                </div>
+
                 {canEdit && (
-                  <>
+                  <div className="row spread atleta-acoes">
+                    <div className="row" style={{ gap: 6 }}>
                     <button className="btn ghost sm" onClick={() => void savePlayer({ ...p, active: !p.active })}>
                       {p.active ? 'Pausar' : 'Ativar'}
                     </button>
@@ -251,32 +252,33 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
                     <button
                       className="btn danger sm"
                       onClick={() => {
-                        if (confirm(`Remover ${p.name}? O histórico de partidas dela continua salvo.`)) {
+                        if (confirm(`Remover ${p.name}? O histórico de partidas dele continua salvo.`)) {
                           void deletePlayer(p.id)
                         }
                       }}
                     >
                       🗑
                     </button>
-                  </>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         )}
         <p className="tiny muted" style={{ marginBottom: 0 }}>
-          Criou a mesmo atleta duas vezes? Toque em <strong>🔗</strong> para juntar as duas:
-          partidas, pontos e sequência das duas passam para a que ficar.{' '}
+          Criou o mesmo atleta duas vezes? Toque em <strong>🔗</strong> para juntar os dois:
+          partidas, pontos e sequência dos dois passam para o que ficar.{' '}
           A foto aparece no pódio do ranking mensal. Toque na foto (ou em <em>pôr/trocar foto</em>) para escolher,
           e em <em>remover foto</em> para voltar às iniciais.
-          Quem está <strong>pausada</strong> não aparece na hora de montar o play, mas mantém o histórico.
+          Quem está <strong>pausado</strong> não aparece na hora de montar o play, mas mantém o histórico.
         </p>
       </div>
     </>
   )
 }
 
-/** Junta um jogador duplicada em outra, preservando o historico das duas. */
+/** Junta um jogador duplicado em outro, preservando o historico dos dois. */
 function JuntarJogadores({
   origem,
   onClose,
@@ -297,8 +299,8 @@ function JuntarJogadores({
   return (
     <Modal title={`Juntar ${origem.name}`} onClose={onClose}>
       <p className="small muted" style={{ marginTop: 0 }}>
-        Use quando a mesmo atleta foi criada duas vezes com nomes diferentes.
-        As <strong>{jogos} partida(s)</strong> de {origem.name} passam para o jogador escolhida,
+        Use quando o mesmo atleta foi cadastrado duas vezes com nomes diferentes.
+        As <strong>{plural(jogos, 'partida')}</strong> de {origem.name} passam para o jogador escolhido,
         somando pontos e mantendo a sequência dele. Depois disso, <strong>{origem.name}</strong> deixa de existir.
       </p>
       <label className="field">
@@ -338,7 +340,7 @@ function JuntarJogadores({
  *
  * O nome e so um ROTULO: cada jogador tem um id proprio e as partidas guardam
  * esse id, nunca o nome. Renomear nao mexe em partida, ponto nem sequencia --
- * e o modal mostra o tamanho do historico dela justamente para deixar isso
+ * e o modal mostra o tamanho do historico dele justamente para deixar isso
  * visivel na hora de trocar.
  *
  * Os apelidos sao os outros grafias que a lista do grupo ja usou para ela. Sao
@@ -416,7 +418,7 @@ function EditarPerfil({
       {repetido && (
         <div className="banner warn" style={{ marginTop: 8 }}>
           Já existe outro jogador com esse nome. Se for a mesma pessoa cadastrada duas vezes,
-          feche aqui e use o <strong>🔗</strong> para juntar as duas.
+          feche aqui e use o <strong>🔗</strong> para juntar os dois.
         </div>
       )}
 
@@ -457,8 +459,8 @@ function EditarPerfil({
       </p>
 
       <div className="banner info" style={{ marginTop: 12 }}>
-        📚 <strong>{historico.partidas} partida(s)</strong> em{' '}
-        <strong>{historico.dias} play(s)</strong> no histórico dele. Trocar o nome{' '}
+        📚 <strong>{plural(historico.partidas, 'partida')}</strong> em{' '}
+        <strong>{plural(historico.dias, 'play')}</strong> no histórico dele. Trocar o nome{' '}
         <strong>não mexe em nada disso</strong>: as partidas ficam ligadas ao cadastro, não ao nome
         escrito.
       </div>

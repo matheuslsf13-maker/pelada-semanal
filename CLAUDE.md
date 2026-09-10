@@ -209,6 +209,28 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   desabilitados). Corrigir placar é o ✏️ da lista "Já jogadas", que abre um modal
   e **preserva o `ended_at`** — não devolve a partida para a fila.
 
+## A tela é um celular na beira da quadra
+
+- **A ordem de criar o play** é quem joga → **formato** → detalhes. O formato é a
+  escolha que muda tudo o que vem depois, então tem cartão próprio logo abaixo
+  dos participantes. Ele é uma **lista vertical**, não um `segmented`: três nomes
+  longos lado a lado quebram no meio das palavras a 375px.
+- **Rótulo em cima, controle embaixo.** O `.stepper` tem `input { flex: 1 }`, então
+  a largura natural dele é a linha inteira — ao lado de um texto, ele cobre o
+  texto. Como filho direto do `.field` funciona; num `.row`, não.
+- `.field > span` vale para `label` **e** `div`. Enquanto só `label.field > span`
+  tinha estilo, metade do formulário saia com rótulo pequeno em caixa alta e a
+  outra metade com texto corrido do corpo.
+- **Separador entre links é desenhado, não digitado** (`::before`). Como texto, o
+  `·` conta como palavra e vai parar sozinho no fim da linha.
+- **Nome de pessoa não quebra no meio**: o `span` de cada jogador é `nowrap` e
+  carrega o `+` da frente, então a linha só parte entre os dois nomes da dupla.
+- **Nada de `(s)`**: use `plural()` de `src/lib/types.ts`.
+- ⚠️ Este projeto é clone de um app **feminino**. Ao mexer em texto, confira a
+  concordância: `partida`, `dupla`, `quadra`, `rodada`, `chave` e `foto` continuam
+  femininas — e **a campeã** também, porque quem vence o mata-mata é a dupla. O
+  que muda é só o que se refere a pessoa.
+
 ## Convenções
 
 - Comentários e nomes em português, sem acento em identificadores.

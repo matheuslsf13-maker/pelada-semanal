@@ -65,6 +65,7 @@ import { useWakeLock } from '../lib/wakelock'
 import { useStore } from '../lib/store'
 import {
   dateLabel,
+  plural,
   todayISO,
   uid,
   type Match,
@@ -73,6 +74,25 @@ import {
   type PlaySession,
 } from '../lib/types'
 import { RankTable } from './Ranking'
+
+/** Os tres formatos, na ordem em que fazem sentido escolher. */
+const FORMATOS: { valor: PlayFormat; rotulo: string; explica: string }[] = [
+  {
+    valor: 'todos',
+    rotulo: '🔁 Todos com todos',
+    explica: 'cada um faz dupla com cada um dos outros, exatamente uma vez',
+  },
+  {
+    valor: 'grupos-duplas',
+    rotulo: '🤝 Grupos + duplas',
+    explica: 'rodízio dentro do grupo, depois dupla fixa por colocação e mata-mata',
+  },
+  {
+    valor: 'grupos',
+    rotulo: '👥 Em grupos',
+    explica: 'o mesmo rodízio dentro de cada grupo, e cada grupo tem o seu pódio',
+  },
+]
 
 export default function Play({
   onToast,
@@ -207,7 +227,7 @@ function ConfirmarExclusao({ session, onClose }: { session: PlaySession; onClose
       <div className="banner err" style={{ marginTop: 0 }}>
         <strong>{session.title}</strong> — {dateLabel(session.date)}
         <br />
-        Isso apaga <strong>{jogadas.length} partida(s) já jogada(s)</strong> e não tem como desfazer.
+        Isso apaga <strong>{plural(jogadas.length, 'partida já jogada', 'partidas já jogadas')}</strong> e não tem como desfazer.
       </div>
 
       {perdas.length > 0 && (
@@ -225,7 +245,7 @@ function ConfirmarExclusao({ session, onClose }: { session: PlaySession; onClose
               </div>
             ))}
             {perdas.length > 5 && (
-              <div className="tiny muted">e mais {perdas.length - 5} jogador(s).</div>
+              <div className="tiny muted">e mais {plural(perdas.length - 5, 'jogador', 'jogadores')}.</div>
             )}
           </div>
         </>
@@ -254,7 +274,7 @@ function ConfirmarExclusao({ session, onClose }: { session: PlaySession; onClose
         disabled={texto.trim().toUpperCase() !== PALAVRA}
         onClick={() => { void deleteSession(session.id); onClose() }}
       >
-        🗑 Apagar o play e os {jogadas.length} resultado(s)
+        🗑 Apagar o play e {plural(jogadas.length, 'o resultado', 'os resultados')}
       </button>
       <button className="btn ghost block sm" style={{ marginTop: 8 }} onClick={onClose}>
         Cancelar
@@ -519,7 +539,7 @@ function NewPlay({
 
         {selected.length >= 4 && (
           <div className="banner info" style={{ marginTop: 14, marginBottom: 0 }}>
-            Com <strong>{selected.length} jogadores</strong> dá para usar <strong>{effCourts} quadra(s)</strong> ao mesmo tempo
+            Com <strong>{selected.length} jogadores</strong> dá para usar <strong>{plural(effCourts, 'quadra')}</strong> ao mesmo tempo
             {restPorVez > 0
               ? ` (${restPorVez} esperam a vez${grupos.length > 1 ? ', revezando dentro do próprio grupo' : ''}, e entra sempre quem está fora há mais tempo)`
               : ' (todos jogam ao mesmo tempo)'}.
@@ -534,7 +554,32 @@ function NewPlay({
       </div>
 
       <div className="card">
-        <div className="section-title">⚙️ Como vai ser o play</div>
+        <div className="section-title">🎾 Formato do play</div>
+        <div className="stack" style={{ gap: 8 }}>
+          {FORMATOS.map((f) => (
+            <button
+              key={f.valor}
+              className={`opcao${format === f.valor ? ' on' : ''}`}
+              onClick={() => {
+                // o grupos+duplas e jogado em grupos de 4; nos outros o grupo
+                // grande e que faz sentido, por isso o padrao muda junto
+                if (f.valor === 'grupos-duplas' && !emDuplas) setPorGrupo(4)
+                if (f.valor === 'grupos' && emDuplas) setPorGrupo(8)
+                setFormat(f.valor)
+              }}
+            >
+              <span className="opcao-marca">{format === f.valor ? '◉' : '○'}</span>
+              <span className="grow" style={{ minWidth: 0 }}>
+                <strong>{f.rotulo}</strong>
+                <span className="tiny muted">{f.explica}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="section-title">⚙️ Detalhes do play</div>
         <div className="stack" style={{ marginTop: 12 }}>
           <label className="field">
             <span>Nome do play</span>
@@ -622,42 +667,6 @@ function NewPlay({
               )}
             </div>
           )}
-
-          <div className="field">
-            <span>Formato</span>
-            <div className="segmented">
-              <button className={format === 'todos' ? 'on' : ''} onClick={() => setFormat('todos')}>
-                🔁 Todos com todos
-              </button>
-              <button
-                className={emDuplas ? 'on' : ''}
-                onClick={() => {
-                  // o organizador joga esse formato em grupos de 4; nos outros
-                  // o grupo grande e que faz sentido, por isso o padrao muda junto
-                  if (!emDuplas) setPorGrupo(4)
-                  setFormat('grupos-duplas')
-                }}
-              >
-                🤝 Grupos + duplas
-              </button>
-              <button
-                className={format === 'grupos' ? 'on' : ''}
-                onClick={() => {
-                  if (emDuplas) setPorGrupo(8)
-                  setFormat('grupos')
-                }}
-              >
-                👥 Em grupos
-              </button>
-            </div>
-            <em className="hint">
-              {format === 'todos'
-                ? 'cada jogador faz dupla com cada um dos outros exatamente uma vez'
-                : emDuplas
-                  ? 'duas fases: primeiro todos com todos dentro do grupo, depois você ganha uma dupla fixa conforme sua colocação — 1º com 1º de outro grupo — e começa o mata-mata. O pódio sai só no fim, do mata-mata inteiro'
-                  : 'o mesmo rodízio, mas dentro de cada grupo — os grupos saem por nível, os pontos continuam individuais, e cada grupo tem o seu pódio'}
-            </em>
-          </div>
 
           <div className={`toggle-card${ranked ? '' : ' avulso'}`}>
             <label className="row" style={{ gap: 10, cursor: 'pointer' }}>
@@ -748,7 +757,7 @@ function NewPlay({
                 : `${Math.floor(Math.min(...tamanhos) / 4)} quadras`}{' '}
               por vez — mesmo tendo {selected.length} jogadores no total.
               <br />
-              Vou montar o play com <strong>{effCourts} quadra(s)</strong>, e{' '}
+              Vou montar o play com <strong>{plural(effCourts, 'quadra')}</strong>, e{' '}
               <strong>{restPorVez} ficam de fora</strong> por vez, revezando dentro do próprio
               grupo. Um grupo precisa de <strong>8 jogadores para alimentar 2 quadras</strong>, 12
               para 3, e assim por diante — então, para usar as {courts}, aumente o tamanho do grupo.
@@ -764,14 +773,14 @@ function NewPlay({
                 ? 'falta 1 jogador'
                 : `faltam ${courts * 4 - selected.length} jogadores`}.
               <br />
-              Vou montar o play com <strong>{effCourts} quadra(s)</strong>
+              Vou montar o play com <strong>{plural(effCourts, 'quadra')}</strong>
               {restPorVez > 0 && <>, revezando quem fica de fora</>}.
             </div>
           )}
 
           {selected.length >= 4 && effCourts === courts && restPorVez === 0 && (
             <div className="banner warn" style={{ margin: '10px 0 0' }}>
-              🪑 Com <strong>{selected.length} jogadores em {effCourts} quadra(s)</strong> todas
+              🪑 Com <strong>{selected.length} jogadores em {plural(effCourts, 'quadra')}</strong> todas
               jogam ao mesmo tempo e <strong>ninguém fica de fora</strong> — nem para descansar.
               <br />
               {/* o motivo muda conforme o grupo alimenta uma quadra ou varias:
@@ -978,7 +987,7 @@ function descreverFase2(grupos: string[][], duplasMM: number): string {
       ? ` — os ${foraDoMataMata} piores da fase de grupos ficam de fora.`
       : ' — todo mundo entra.') +
     ` Começa em ${nome}` +
-    (byes > 0 ? `, com ${byes} dupla(s) passando de bye.` : '.') +
+    (byes > 0 ? `, com ${byes === 1 ? 'uma dupla passando' : `${byes} duplas passando`} de bye.` : '.') +
     ` São ${jogos} jogos até a campeã.`
   )
 }
@@ -1428,7 +1437,7 @@ function PlayDetail({
     }))
     await replaceSessionMatches(session.id, [...preservadas, ...novas])
     await saveSession({ ...session, rounds: preservadas.length + novas.length })
-    onToast(`${novas.length} partida(s) refeita(s) 🔄`)
+    onToast(`${novas.length === 1 ? 'uma partida refeita' : `${novas.length} partidas refeitas`} 🔄`)
   }
 
   async function regenerate() {
@@ -1615,7 +1624,7 @@ function PlayDetail({
           🤝 <strong>{vivas.length > 1 ? nomeDaRodada(vivas.length) : 'Mata-mata encerrado'}.</strong>{' '}
           {vivas.length > 1 ? (
             <>
-              {vivas.length} dupla(s) ainda na disputa — quem perde está fora. As duplas são fixas
+              {plural(vivas.length, 'dupla')} ainda na disputa — quem perde está fora. As duplas são fixas
               até o fim, e o pódio do dia sai <strong>apenas do mata-mata</strong>.
             </>
           ) : (
@@ -2015,7 +2024,7 @@ function Duo({ ids, ocupados }: { ids: [string, string]; ocupados?: Set<string> 
         {ids.map((id, i) => (
           <span key={id}>
             {i > 0 && <span className="muted"> + </span>}
-            <span className={ocupados?.has(id) ? 'ocupada' : undefined}>
+            <span className={`nowrap${ocupados?.has(id) ? ' ocupada' : ''}`}>
               {nameOf(id)}
               {ocupados?.has(id) && ' ⏳'}
             </span>
@@ -2117,7 +2126,7 @@ function MatchCard({
     )
   }
 
-  // ---- passo 2: quantos games a perdedor fez ----
+  // ---- passo 2: quantos games o perdedor fez ----
   if (winner) {
     const loserIds = winner === 'a' ? match.team_b : match.team_a
     return (
@@ -2352,7 +2361,7 @@ function CorrigirPlacar({
   if (winner) {
     const perdedors = winner === 'a' ? match.team_b : match.team_a
     return (
-      <Modal title="Quantos games a perdedor fez?" onClose={onClose}>
+      <Modal title="Quantos games o perdedor fez?" onClose={onClose}>
         <button className="btn ghost sm" style={{ marginBottom: 10 }} onClick={() => setWinner(null)}>
           ‹ trocar quem venceu
         </button>
