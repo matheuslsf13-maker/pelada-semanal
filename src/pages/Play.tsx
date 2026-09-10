@@ -1108,7 +1108,7 @@ function PlayDetail({
     () => (session.duos?.length ? duplasVivas(session.duos, doMataMata) : []),
     [session.duos, doMataMata],
   )
-  /** A fase 1 acabou e a 2 ainda nao nasceu: e a hora de sortear as duplas. */
+  /** A fase 1 acabou e a 2 ainda nao nasceu: e a hora de formar as duplas. */
   const podeGerarFase2 =
     soFase2 && daFase2.length === 0 && daFase1.length > 0 && daFase1.every(isPlayed)
   /** A rodada atual acabou e ainda ha mais de uma dupla viva. */
@@ -1475,7 +1475,8 @@ function PlayDetail({
 
   /** Troca as ocupados por quem esta livre, mantendo equilibrio e duplas novas. */
   /**
-   * Sorteia a fase 2: a colocacao de cada um no seu grupo vira a dupla fixa.
+   * Forma a fase 2: a colocacao de cada um no seu grupo vira a dupla fixa.
+   * Nao ha sorteio -- rodar de novo daria exatamente o mesmo resultado.
    *
    * So roda com a fase 1 inteira lancada -- e a colocacao final que define
    * quem joga com quem, entao gerar antes seria chutar.
@@ -1611,7 +1612,7 @@ function PlayDetail({
       {soFase2 && daFase2.length === 0 && (
         <div className="banner info">
           🤝 <strong>Fase de grupos.</strong> Quando todas as partidas dos grupos tiverem placar,
-          toque em <strong>Sortear o mata-mata</strong>: o melhor 1º forma dupla com o segundo
+          toque em <strong>Montar as duplas e a chave</strong>: o melhor 1º forma dupla com o segundo
           melhor 1º, o terceiro com o quarto, e assim por diante até os últimos. As duplas são
           fixas, quem perde está fora, e as melhores da fase de grupos podem passar de{' '}
           <strong>bye</strong>. <strong>Só o mata-mata vale pontos</strong> no pódio do dia.
@@ -1743,14 +1744,14 @@ function PlayDetail({
           </div>
           <p className="tiny muted" style={{ marginTop: 0 }}>
             {podeGerarFase2
-              ? 'A fase de grupos acabou. O próximo passo é formar as duplas fixas e sortear o mata-mata — só depois disso o play tem pódio.'
+              ? 'A fase de grupos acabou. O próximo passo é formar as duplas fixas e montar a chave do mata-mata — só depois disso o play tem pódio.'
               : `A rodada terminou e ainda há ${vivas.length} duplas vivas. Monte a próxima antes de encerrar.`}
           </p>
           <button
             className="btn marca block"
             onClick={() => void (podeGerarFase2 ? gerarFase2() : gerarProximaRodada())}
           >
-            {podeGerarFase2 ? '🤝 Sortear o mata-mata' : `🥅 Montar ${rotuloDaProxima.toLowerCase()}`}
+            {podeGerarFase2 ? '🤝 Montar as duplas e a chave' : `🥅 Montar ${rotuloDaProxima.toLowerCase()}`}
           </button>
         </div>
       )}

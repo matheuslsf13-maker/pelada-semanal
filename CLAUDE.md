@@ -92,8 +92,7 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     melhor com melhor, e com número ímpar de grupos a sobra cai no vizinho de
     cima em vez de num nível diferente. Parceiro nunca é do mesmo grupo. As
     duplas viram **chaves** e jogam só dentro da chave.
-  - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Sortear a
-    fase 2"), porque depende da colocação final.
+  - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Montar as duplas e a chave"), porque depende da colocação final.
   - **Só a fase 2 vale pontos** no pódio do dia, e o pódio é **por chave**.
   - **O mata-mata tem tamanho alvo em duplas** (`sessions.duplas_mm`, padrão 8 =
     16 atletas = quartas). Sobrando gente, os **piores colocados da fase de
