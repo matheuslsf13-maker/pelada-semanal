@@ -13,6 +13,8 @@ export type PlayerStat = {
   days: number
   /** Pontos de bonus por sequencia de vitorias ("em chamas"). */
   bonus: number
+  /** Pontos pagos por bye no mata-mata das duplas (ver `pontosDeBye`). */
+  bye: number
 }
 
 export type PairKeyStat = {
@@ -24,7 +26,7 @@ export type PairKeyStat = {
 }
 
 export const emptyStat = (player_id: string): PlayerStat => ({
-  player_id, matches: 0, wins: 0, losses: 0, points: 0, gamesWon: 0, gamesLost: 0, days: 0, bonus: 0,
+  player_id, matches: 0, wins: 0, losses: 0, points: 0, gamesWon: 0, gamesLost: 0, days: 0, bonus: 0, bye: 0,
 })
 
 export function winRate(s: PlayerStat): number {
@@ -60,6 +62,26 @@ export function playedMatches(
     if (opts.ranked && s.ranked === false) return false
     return true
   })
+}
+
+/**
+ * AS PARTIDAS QUE VALEM PONTOS.
+ *
+ * No `grupos-duplas` a fase de grupos so serve para formar as duplas: ela nao
+ * pontua. O ranking do DIA ja sabia disso, mas o do MES somava tudo -- entao o
+ * total do mes de uma jogadora nao batia com a soma dos dias dela, e quem caiu
+ * cedo no mata-mata aparecia na frente de quem foi longe por causa de pontos
+ * de uma fase que, na regra, nao existe.
+ *
+ * Fica de fora daqui de proposito: o Elo (`ratings`), as parcerias e os
+ * confrontos. Aquelas partidas ACONTECERAM -- elas so nao dao ponto.
+ */
+export function pontuaveis(sessoes: PlaySession[], matches: Match[]): Match[] {
+  const semFase1 = new Set(
+    sessoes.filter((s) => s.format === 'grupos-duplas').map((s) => s.id),
+  )
+  if (semFase1.size === 0) return matches
+  return matches.filter((m) => !semFase1.has(m.session_id) || (m.fase ?? 1) >= 2)
 }
 
 export function computeStats(matches: Match[]): Map<string, PlayerStat> {
@@ -140,6 +162,8 @@ export type DuoStat = {
   points: number
   gamesWon: number
   gamesLost: number
+  /** Pontos que vieram de bye, ja somados em `points`. */
+  bye: number
   /** Ids dos plays em que a dupla jogou. */
   sessions: Set<string>
 }
@@ -152,7 +176,7 @@ export function duoStats(matches: Match[]): Map<string, DuoStat> {
     let d = out.get(key)
     if (!d) {
       const [a, b] = ids[0] < ids[1] ? ids : [ids[1], ids[0]]
-      d = { key, a, b, matches: 0, wins: 0, losses: 0, points: 0, gamesWon: 0, gamesLost: 0, sessions: new Set() }
+      d = { key, a, b, matches: 0, wins: 0, losses: 0, points: 0, gamesWon: 0, gamesLost: 0, bye: 0, sessions: new Set() }
       out.set(key, d)
     }
     d.matches++
@@ -357,8 +381,13 @@ function rodadaDeSaida(entraram: number): string {
   return `na rodada de ${entraram} duplas`
 }
 
-export function rankDuplasDoDia(matches: Match[], nameOf: (id: string) => string): DuplaDoDia[] {
-  const stats = duoStats(matches)
+export function rankDuplasDoDia(
+  matches: Match[],
+  nameOf: (id: string) => string,
+  /** Pontos de bye por dupla, de `pontosDeBye().porDupla`. */
+  bye?: Map<string, number>,
+): DuplaDoDia[] {
+  const stats = bye ? aplicarByeNasDuplas(duoStats(matches), bye) : duoStats(matches)
   const ateFase = new Map<string, number>()
   for (const m of matches) {
     // a disputa de 3o divide a fase com a final; contar ela aqui poria as
@@ -435,3 +464,115 @@ export function rankDuplasDoDia(matches: Match[], nameOf: (id: string) => string
 
 /** Quantas duplas sobem ao podio do mata-mata: ouro, prata e bronze. */
 export const DUPLAS_NO_PODIO = 3
+
+
+/** Os pontos que o bye pagou, pelos dois lados: por pessoa e por dupla. */
+export type PontosDeBye = {
+  porJogadora: Map<string, number>
+  porDupla: Map<string, number>
+}
+
+/**
+ * PONTOS DE BYE
+ *
+ * No mata-mata das duplas, quem foi melhor na fase de grupos passa direto de
+ * uma rodada. O atalho e o premio -- mas do jeito que estava ele COBRAVA um
+ * preco: a dupla que passa joga uma partida a menos, e como os pontos saem do
+ * placar, ela terminava o mes atras de quem precisou jogar para chegar no
+ * mesmo lugar da chave.
+ *
+ * Entao o bye paga o que uma vitoria daquela rodada pagou, NA MEDIA. Nem
+ * menos, que seria punir quem foi bem nos grupos, nem mais, que faria valer
+ * mais a pena nao jogar. Se as vencedoras da rodada fizeram 4 e 2 pontos, o
+ * bye paga 3.
+ *
+ * NAO vira partida: bye nao tem adversario, entao nao pode mexer no Elo, no
+ * retrospecto (V/D) nem na forca da dupla. E so pontos, somados no fim.
+ */
+export function pontosDeBye(sessoes: PlaySession[], matches: Match[]): PontosDeBye {
+  const porJogadora = new Map<string, number>()
+  const porDupla = new Map<string, number>()
+  const chave = (d: readonly string[]) => [...d].sort().join('|')
+
+  for (const s of sessoes) {
+    if (s.format !== 'grupos-duplas' || !s.duos?.length) continue
+    // a disputa de 3o fica de fora: ela divide a fase com a final e nao e uma
+    // rodada da chave, entao nao ha bye para calcular nela
+    const daChave = matches.filter(
+      (m) => m.session_id === s.id && (m.fase ?? 1) >= 2 && !m.disputa_3o,
+    )
+    if (daChave.length === 0) continue
+
+    const fases = [...new Set(daChave.map((m) => m.fase as number))].sort((x, y) => x - y)
+    let vivas = s.duos
+    for (const fase of fases) {
+      const daFase = daChave.filter((m) => m.fase === fase)
+      const jogadas = daFase.filter(isPlayed)
+      // rodada que nem comecou nao paga nada ainda: sem placar nenhum nao da
+      // para saber quanto uma vitoria valeu nela
+      if (jogadas.length === 0) break
+
+      // quem tem partida marcada nesta rodada nao passou de bye -- inclusive
+      // quem ainda vai jogar, senao a dupla que esta em quadra viraria bye
+      const comPartida = new Set<string>()
+      for (const m of daFase) {
+        comPartida.add(chave(m.team_a))
+        comPartida.add(chave(m.team_b))
+      }
+
+      const ganhos = jogadas.map((m) => {
+        const [pa, pb] = matchPoints(m.score_a as number, m.score_b as number)
+        return Math.max(pa, pb)
+      })
+      const media = Math.max(1, Math.round(ganhos.reduce((t, x) => t + x, 0) / ganhos.length))
+
+      for (const d of vivas) {
+        if (comPartida.has(chave(d))) continue
+        porDupla.set(pairKey(d[0], d[1]), (porDupla.get(pairKey(d[0], d[1])) ?? 0) + media)
+        for (const id of d) porJogadora.set(id, (porJogadora.get(id) ?? 0) + media)
+      }
+
+      const caiu = new Set(
+        jogadas.map((m) =>
+          chave((m.score_a as number) > (m.score_b as number) ? m.team_b : m.team_a),
+        ),
+      )
+      vivas = vivas.filter((d) => !caiu.has(chave(d)))
+    }
+  }
+  return { porJogadora, porDupla }
+}
+
+/** Soma os pontos de bye nas estatisticas individuais, sem mexer no resto. */
+export function aplicarBye(
+  stats: Map<string, PlayerStat>,
+  bye: Map<string, number>,
+): Map<string, PlayerStat> {
+  const out = new Map<string, PlayerStat>()
+  for (const [id, s] of stats) out.set(id, { ...s })
+  for (const [id, pontos] of bye) {
+    const s = out.get(id)
+    // quem so tem bye e nenhuma partida nao existe na tabela: no mata-mata a
+    // dupla sempre joga pelo menos a rodada seguinte
+    if (!s) continue
+    s.points += pontos
+    s.bye += pontos
+  }
+  return out
+}
+
+/** O mesmo, nas estatisticas das duplas. */
+export function aplicarByeNasDuplas(
+  duos: Map<string, DuoStat>,
+  bye: Map<string, number>,
+): Map<string, DuoStat> {
+  const out = new Map<string, DuoStat>()
+  for (const [k, d] of duos) out.set(k, { ...d, sessions: new Set(d.sessions) })
+  for (const [k, pontos] of bye) {
+    const d = out.get(k)
+    if (!d) continue
+    d.points += pontos
+    d.bye += pontos
+  }
+  return out
+}

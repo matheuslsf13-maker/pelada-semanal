@@ -1,4 +1,4 @@
-import type { PlayerStat } from './stats'
+import type { DuplaDoDia, PlayerStat } from './stats'
 import { balance } from './stats'
 import { streakLevel, type PodioDoDia } from './streaks'
 import { dateLabel, monthLabel } from './types'
@@ -107,6 +107,14 @@ export type DayTextOpts = {
   nameOf: (id: string) => string
   /** Os podios a mostrar: todos, ou so o do grupo escolhido. */
   podios?: PodioDoDia[]
+  /**
+   * No grupos+duplas, o podio do mata-mata.
+   *
+   * Quando ha chave e ELA que decide o dia, nao a soma de pontos: com bye a
+   * vice chega a somar mais que a campea. Entao o texto coroa a dupla que
+   * ganhou a final, e a classificacao individual vem depois, informativa.
+   */
+  duplas?: DuplaDoDia[]
   /** Sequencia de cada jogador depois deste play (so quem tem 2 ou mais). */
   streaks?: Map<string, number>
   /** O destaque do texto: a maior sequencia entre as que estao aqui. */
@@ -114,7 +122,7 @@ export type DayTextOpts = {
 }
 
 export function dayRankingText(opts: DayTextOpts): string {
-  const { date, title, rows, nameOf, podios, streaks, award } = opts
+  const { date, title, rows, nameOf, podios, duplas, streaks, award } = opts
   const seq = (id: string) => streaks?.get(id) ?? 0
 
   // um grupo so escolhido: o titulo ja diz qual, para nao mandar no grupo do
@@ -130,7 +138,30 @@ export function dayRankingText(opts: DayTextOpts): string {
   const varios = Boolean(podios && podios.length > 1)
   const noPodio = new Set((podios ?? []).flatMap((p) => p.rows.map((x) => x.player_id)))
 
-  if (varios) {
+  if (duplas && duplas.length > 0) {
+    const titulos = ['*Campeões do dia*', '*Vice-campeões*', '*3º lugar*']
+    partes.push(
+      '\n' +
+        duplas
+          .slice(0, 3)
+          .map(
+            (d, i) =>
+              `${MEDALHAS[i]} ${titulos[i]}\n` +
+              `     *${nameOf(d.a)} + ${nameOf(d.b)}* — ${d.wins}V ${d.losses}D` +
+              (d.bye > 0 ? ` · _passou de bye_` : ''),
+          )
+          .join('\n'),
+    )
+    partes.push(
+      '\n*Pontos do dia*\n' +
+        rows
+          .map((s, i) => {
+            const doBye = s.bye > 0 ? ` _(${s.bye} de bye)_` : ''
+            return `${i + 1}º ${nameOf(s.player_id)} — ${pts(s.points)}${doBye}`
+          })
+          .join('\n'),
+    )
+  } else if (varios) {
     // um podio por grupo: cada grupo e um rodizio fechado e so compete consigo
     const grupoDe = new Map<string, number>()
     for (const p of podios as PodioDoDia[]) {

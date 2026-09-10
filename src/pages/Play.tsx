@@ -28,16 +28,19 @@ import { dayRankingText, scheduleText } from '../lib/share'
 import { isPlayed, matchPoints } from '../lib/scoring'
 import { loadFins, loadInicios, saveFins, saveInicios, type Horarios } from '../lib/emQuadra'
 import {
-  DUPLAS_NO_PODIO,
+  aplicarBye,
   balance,
   buildHistory,
   computeStats,
-  rankDuplasDoDia,
+  type DuplaDoDia,
+  DUPLAS_NO_PODIO,
   pairKey,
   playedMatches,
-  ratings,
-  rankPlayers,
   type PlayerStat,
+  pontosDeBye,
+  rankDuplasDoDia,
+  rankPlayers,
+  ratings,
 } from '../lib/stats'
 import {
   MODOS,
@@ -1186,11 +1189,23 @@ function PlayDetail({
   /** Ha um proximo passo obrigatorio antes de encerrar o play? */
   const faltaFase = podeGerarFase2 || podeGerarRodada
 
+  /** Os pontos que o bye pagou neste play (so existe no grupos+duplas). */
+  const byeDoDia = useMemo(
+    () => pontosDeBye([session], matches),
+    [session, matches],
+  )
+
+  /** O podio do mata-mata, quando o play foi em grupos+duplas. */
+  const duplasDoDia = useMemo(
+    () => (soFase2 ? rankDuplasDoDia(partidasDaFase2, nameOf, byeDoDia.porDupla) : []),
+    [soFase2, partidasDaFase2, nameOf, byeDoDia],
+  )
+
   const dayRows = useMemo(() => {
     const todas = playedMatches(data, { sessionId: session.id })
     // a fase de grupos so serviu para formar as duplas; da fase 2 em diante conta
     const ms = soFase2 ? todas.filter((m) => (m.fase ?? 1) >= 2) : todas
-    return rankPlayers(computeStats(ms), nameOf)
+    return rankPlayers(aplicarBye(computeStats(ms), byeDoDia.porJogadora), nameOf)
   }, [data, session.id, nameOf, soFase2])
 
   /**
@@ -1964,7 +1979,7 @@ function PlayDetail({
                   {award.usouVida && ' (uma vida foi consumida para segurar o status hoje)'}
                 </div>
               )}
-              {soFase2 && <DuplasDoDia partidas={partidasDaFase2} />}
+              {soFase2 && <DuplasDoDia linhas={duplasDoDia} />}
               {podios.length > 1 ? (
                 podios.map((p) => (
                   <div key={p.grupo} style={{ marginBottom: 14 }}>
@@ -2026,6 +2041,7 @@ function PlayDetail({
                       rows: rowsSel,
                       nameOf,
                       podios: podiosSel,
+                      duplas: soFase2 ? duplasDoDia : undefined,
                       streaks: streaksDoDia,
                       award,
                     }),
@@ -2945,9 +2961,8 @@ function ResolverCadastro({
  * um podio na tela que nao bate com o que vale para a sequencia seria bug
  * esperando para ser reportado.
  */
-function DuplasDoDia({ partidas }: { partidas: Match[] }) {
+function DuplasDoDia({ linhas }: { linhas: DuplaDoDia[] }) {
   const { nameOf, playerById } = useStore()
-  const linhas = useMemo(() => rankDuplasDoDia(partidas, nameOf), [partidas, nameOf])
   if (linhas.length === 0) return null
 
   const medalhas = ['🥇', '🥈', '🥉']

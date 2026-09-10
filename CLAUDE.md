@@ -105,8 +105,21 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     misturaram no mata-mata — não há pódio por grupo aqui. **O 🔥 segue esse mesmo
     pódio** (`rankDuplasDoDia`, compartilhado com a tela): são 6 de 16 num play típico,
     menos generoso que o modo em grupos, onde 4 grupos de 4 já levam 8 ao pódio.
-    ⚠️ `computeStreaks` **descarta a fase 1** neste formato: ela não pontua, então não
-    pode decidir quem segura a sequência.
+    "Só a fase 2 pontua" vale **também no mês** (`pontuaveis`) — sem isso o total do
+    mês não era a soma dos dias. O Elo continua contando a fase de grupos: aquelas
+    partidas aconteceram, elas só não dão ponto.
+  - ⚠️ **O ouro e a prata saem da FINAL, nunca da conta de vitórias**
+    (`DuplaDoDia.medalha`). Com bye a vice chega à final com as mesmas vitórias da
+    campeã e com **mais pontos**, porque jogou uma partida a mais — o desempate por
+    pontos invertia o pódio, e as duas saíam rotuladas "caiu na final". O bronze sai
+    da disputa de 3º. O mesmo vale para "dias vencidos" em `computeStreaks`.
+    Já medido: acontecia em **6%** dos plays.
+  - **O bye paga pontos** (`pontosDeBye`). Quem vai bem nos grupos passa direto de
+    uma rodada — e jogava **uma partida a menos**, terminando o mês atrás de quem
+    precisou jogar para chegar no mesmo lugar da chave. O bye paga o que uma
+    vitória daquela rodada pagou **na média**: nem menos, que puniria quem foi bem,
+    nem mais, que faria valer a pena não jogar. Não vira partida — bye não tem
+    adversário, então não mexe no Elo, no retrospecto nem na força da dupla.
   - **O mata-mata tem tamanho alvo em duplas** (`sessions.duplas_mm`, padrão 8 =
     16 atletas = quartas). Sobrando gente, os **piores colocados da fase de
     grupos ficam de fora**: com 20 atletas saem 4 e ficam 16. Faltando, todos

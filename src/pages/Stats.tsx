@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Avatar, Empty, Modal, StatBox } from '../components/ui'
 import {
+  aplicarBye,
+  aplicarByeNasDuplas,
   avgPoints,
-
   balance,
   computeStats,
   duoMatches,
+  type DuoStat,
   duoStats,
   emptyStat,
   opponentStats,
+  type PairKeyStat,
   partnerStats,
   playedMatches,
+  pontosDeBye,
+  pontuaveis,
   winRate,
-  type DuoStat,
-  type PairKeyStat,
 } from '../lib/stats'
 import {
   JOGOS_PARA_ENTROSAMENTO,
@@ -60,8 +63,10 @@ export default function Stats({ abrir, onAbriu }: { abrir?: Modo | null; onAbriu
   const streaks = useMemo(() => computeStreaks(data), [data])
   const stats = useMemo(() => {
     const awards = period === 'all' ? streaks.awards : streaks.awards.filter((a) => a.month === period)
-    return applyBonuses(computeStats(matches), awards)
-  }, [matches, streaks, period])
+    const ms = pontuaveis(data.sessions, matches)
+    const bye = pontosDeBye(data.sessions, ms).porJogadora
+    return aplicarBye(applyBonuses(computeStats(ms), awards), bye)
+  }, [data.sessions, matches, streaks, period])
 
   const comJogo = useMemo(
     () => [...data.players].filter((p) => (stats.get(p.id)?.matches ?? 0) > 0),
@@ -310,7 +315,18 @@ function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }
   const [ordem, setOrdem] = useState<Ordem>('jogos')
   const [aberta, setAberta] = useState<DuoStat | null>(null)
 
-  const duplas = useMemo(() => [...duoStats(matches).values()], [matches])
+  // o mesmo bye conta aqui: a dupla que passou direto tambem nao pode
+  // aparecer com menos pontos por causa da partida que nao teve
+  const { data: dadosDoBye } = useStore()
+  const duplas = useMemo(
+    () => [
+      ...aplicarByeNasDuplas(
+        duoStats(pontuaveis(dadosDoBye.sessions, matches)),
+        pontosDeBye(dadosDoBye.sessions, matches).porDupla,
+      ).values(),
+    ],
+    [matches, dadosDoBye.sessions],
+  )
 
   // a forca sai do historico INTEIRO da dupla, e nao do periodo filtrado:
   // e o que os dois renderam juntos desde sempre

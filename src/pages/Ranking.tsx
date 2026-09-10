@@ -4,8 +4,11 @@ import { monthRankingText } from '../lib/share'
 import { POINTS_TABLE } from '../lib/scoring'
 import {
   balance,
+  aplicarBye,
   computeStats,
   playedMatches,
+  pontosDeBye,
+  pontuaveis,
   rankPlayers,
   winRate,
   type PlayerStat,
@@ -86,9 +89,15 @@ export default function Ranking({
 
   const rows = useMemo(() => {
     // no mes entram so os plays do campeonato; no historico entra tudo
-    const ms = playedMatches(data, historico ? {} : { month: activeMonth, ranked: true })
+    const todas = playedMatches(data, historico ? {} : { month: activeMonth, ranked: true })
+    // a fase de grupos do grupos+duplas nao pontua: sem isto o total do mes
+    // nao batia com a soma dos dias
+    const ms = pontuaveis(data.sessions, todas)
     const awards = historico ? streaks.awards : streaks.awards.filter((a) => a.month === activeMonth)
-    return rankPlayers(applyBonuses(computeStats(ms), awards), nameOf)
+    // o bye do mata-mata paga pontos: quem passa direto joga uma partida a
+    // menos e nao pode terminar o mes atras de quem precisou jogar
+    const bye = pontosDeBye(data.sessions, ms).porJogadora
+    return rankPlayers(aplicarBye(applyBonuses(computeStats(ms), awards), bye), nameOf)
   }, [data, activeMonth, historico, nameOf, streaks])
 
   const fire = comStatus
@@ -483,6 +492,9 @@ function ConfirmarFechamento({
 export function RankTable({ rows, fire }: { rows: PlayerStat[]; fire?: Map<string, number> }) {
   const { nameOf, playerById } = useStore()
   const showBonus = rows.some((r) => r.bonus > 0)
+  // a coluna so aparece quando ha bye no recorte: nos plays sem chave
+  // ela seria uma coluna de zeros ocupando largura no celular
+  const showBye = rows.some((r) => r.bye > 0)
   const posicoes = positionsOf(rows)
   return (
     <div className="scroll-x">
@@ -493,6 +505,7 @@ export function RankTable({ rows, fire }: { rows: PlayerStat[]; fire?: Map<strin
             <th style={{ textAlign: 'left' }}>Jogador</th>
             <th>Pts</th>
             {showBonus && <th>🔥</th>}
+            {showBye && <th title="Pontos pagos por bye no mata-mata">🎫</th>}
             <th>J</th>
             <th>V</th>
             <th>D</th>
@@ -519,6 +532,7 @@ export function RankTable({ rows, fire }: { rows: PlayerStat[]; fire?: Map<strin
                 </td>
                 <td style={{ fontWeight: 800, color: 'var(--marca)' }}>{s.points}</td>
                 {showBonus && <td className="tiny" style={{ color: 'var(--bronze)', fontWeight: 800 }}>{s.bonus > 0 ? `+${s.bonus}` : ''}</td>}
+                {showBye && <td className="tiny" style={{ color: 'var(--marca)', fontWeight: 800 }}>{s.bye > 0 ? `+${s.bye}` : ''}</td>}
                 <td>{s.matches}</td>
                 <td>{s.wins}</td>
                 <td>{s.losses}</td>
