@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AvisoDoBanco } from '../components/AvisoDoBanco'
 import ImportarLista from '../components/ImportarLista'
 import { Avatar, Empty, Modal, StatBox, Stepper, shareOrCopy } from '../components/ui'
 import {
@@ -169,6 +170,7 @@ function PlayList({
       )}
       <div className="card">
         <div className="section-title">📅 Plays</div>
+        <AvisoDoBanco />
         {sessions.length === 0 ? (
           <Empty>Nenhum play ainda. Crie o primeiro e o app monta as duplas pra você.</Empty>
         ) : (

@@ -9,11 +9,57 @@ import type { Repo } from './repo'
  * a cada escrita -- entao o aviso aparece exatamente quando a tentativa
  * acontece, que e a hora em que ele importa.
  */
-export const avisosDoBanco = { pagamento: false }
+export const avisosDoBanco = { pagamento: false, colunas: new Set<string>() }
 
 function client() {
   if (!supabase) throw new Error('Supabase nao configurado')
   return supabase
+}
+
+/**
+ * O nome da coluna que o banco nao reconheceu, quando foi esse o problema.
+ *
+ * O PostgREST fala de dois jeitos, conforme o erro venha do cache de schema
+ * ou do proprio Postgres:
+ *
+ *   Could not find the 'desempate' column of 'sessions' in the schema cache
+ *   column sessions.desempate does not exist
+ */
+function colunaQueFaltou(msg?: string): string | null {
+  if (!msg) return null
+  const cache = msg.match(/Could not find the '([^']+)' column/)
+  if (cache) return cache[1]
+  const pg = msg.match(/column (?:[\w.]+\.)?"?([\w]+)"? does not exist/)
+  if (pg) return pg[1]
+  // violacao de restricao: a coluna existe mas nao aceita o valor
+  const check = msg.match(/violates check constraint "\w*?_(\w+)_check"/)
+  if (check) return check[1]
+  return null
+}
+
+/**
+ * Grava tirando so o que o banco nao aceita, uma coluna por vez.
+ *
+ * Tirar o bloco inteiro de uma vez -- como era antes -- faz o app perder
+ * dados que o banco aceitaria de boa vontade, e em silencio. Aqui cada
+ * tentativa devolve o nome de UMA coluna, ela sai, e o resto entra.
+ */
+async function upsertTolerante<T extends object>(tabela: string, dados: T | T[]): Promise<void> {
+  const lista: Record<string, unknown>[] = (Array.isArray(dados) ? dados : [dados]).map((d) => ({
+    ...(d as object),
+  }))
+  if (lista.length === 0) return
+
+  for (let tentativa = 0; tentativa < 12; tentativa++) {
+    const { error } = await client().from(tabela).upsert(lista)
+    if (!error) return
+    const coluna = colunaQueFaltou(error.message)
+    if (!coluna || !(coluna in lista[0])) throw error
+    for (const item of lista) delete item[coluna]
+    avisosDoBanco.colunas.add(`${tabela}.${coluna}`)
+    if (/categoria|pago_mes|pago_avulso/.test(coluna)) avisosDoBanco.pagamento = true
+  }
+  throw new Error(`Nao consegui gravar em ${tabela} depois de varias tentativas`)
 }
 
 export const supabaseRepo: Repo = {
@@ -42,53 +88,14 @@ export const supabaseRepo: Repo = {
     }
   },
   async savePlayer(p: Player) {
-    const { error } = await client().from('players').upsert(p)
-    if (!error) return
-    // banco ainda sem a coluna do apelido (script 07 nao rodou): salva o resto,
-    // para nao travar o cadastro de quem ainda nao migrou
-    if (/nickname|categoria|pago_mes|pago_avulso/.test(error.message ?? '')) {
-      // o banco nao conhece (ou nao aceita) a coluna: salva o resto, mas
-      // marca, para a tela avisar em vez de o pagamento sumir calado
-      if (/categoria|pago_mes|pago_avulso/.test(error.message ?? '')) {
-        avisosDoBanco.pagamento = true
-      }
-      const {
-        nickname: _apelido,
-        categoria: _cat,
-        pago_mes: _mes,
-        pago_avulso: _avulso,
-        ...resto
-      } = p
-      const retry = await client().from('players').upsert(resto)
-      if (retry.error) throw retry.error
-      return
-    }
-    throw error
+    await upsertTolerante('players', p)
   },
   async deletePlayer(id: string) {
     const { error } = await client().from('players').delete().eq('id', id)
     if (error) throw error
   },
   async saveSession(s: PlaySession) {
-    const { error } = await client().from('sessions').upsert(s)
-    if (!error) return
-    // banco ainda sem as colunas do modo em grupos (script 05 nao rodou):
-    // salva o resto, que e o que o play precisa para funcionar
-    if (/format|groups|ranked|desempate/.test(error.message ?? '')) {
-      const {
-        format: _f,
-        groups: _g,
-        ranked: _r,
-        desempate: _d,
-        desempate_vai2: _d2,
-        desempates: _ds,
-        ...resto
-      } = s
-      const retry = await client().from('sessions').upsert(resto)
-      if (retry.error) throw retry.error
-      return
-    }
-    throw error
+    await upsertTolerante('sessions', s)
   },
   async deleteSession(id: string) {
     const sb = client()
@@ -98,18 +105,7 @@ export const supabaseRepo: Repo = {
     if (error) throw error
   },
   async saveMatches(ms: Match[]) {
-    if (ms.length === 0) return
-    const { error } = await client().from('matches').upsert(ms)
-    if (!error) return
-    // banco ainda sem as colunas de horario (scripts 04/05 nao rodaram):
-    // salva o resto, que o app compensa com a copia local
-    if (/started_at|ended_at/.test(error.message ?? '')) {
-      const semHorarios = ms.map(({ started_at: _i, ended_at: _f, ...resto }) => resto)
-      const retry = await client().from('matches').upsert(semHorarios)
-      if (retry.error) throw retry.error
-      return
-    }
-    throw error
+    await upsertTolerante('matches', ms)
   },
   async deleteMatchesOfSession(sessionId: string) {
     const { error } = await client().from('matches').delete().eq('session_id', sessionId)
