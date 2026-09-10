@@ -826,15 +826,13 @@ function NewPlay({
                 <div className="stack" style={{ gap: 8 }}>
                   {['Grupos', 'Duplas fixas', 'Semifinal', 'Final'].map((rotulo, i) => (
                     <div key={rotulo} className="fase-box">
-                      <div className="row spread" style={{ gap: 10 }}>
-                        <strong className="tiny grow">{rotulo}</strong>
-                        <Stepper
-                          value={alvos[i]}
-                          min={2}
-                          max={12}
-                          onChange={(v) => setAlvos((a) => a.map((x, k) => (k === i ? v : x)))}
-                        />
-                      </div>
+                      <span className="fase-nome">{rotulo}</span>
+                      <Stepper
+                        value={alvos[i]}
+                        min={2}
+                        max={12}
+                        onChange={(v) => setAlvos((a) => a.map((x, k) => (k === i ? v : x)))}
+                      />
                       <select
                         className="select"
                         style={{ marginTop: 6 }}

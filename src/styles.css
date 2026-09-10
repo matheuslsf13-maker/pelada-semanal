@@ -1085,6 +1085,19 @@ textarea.input { line-height: 1.45; }
 .fase-box {
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: 10px;
   background: var(--card-2);
 }
+.fase-nome {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--marca);
+  margin-bottom: 6px;
+}
+/* o stepper quer a largura toda (o input dele e `flex: 1`), entao dentro de um
+   `.row` ele cobria o vizinho -- aqui ele fica sozinho na linha, como nos
+   outros campos do formulario */
+.fase-box .stepper { width: 100%; }
