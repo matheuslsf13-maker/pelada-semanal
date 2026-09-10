@@ -307,3 +307,47 @@ export function buildHistory(matches: Match[], decay = 1): History {
 function inc(map: Map<string, number>, key: string, by: number) {
   map.set(key, (map.get(key) ?? 0) + by)
 }
+
+/**
+ * AS DUPLAS DO MATA-MATA, DA CAMPEA A PRIMEIRA ELIMINADA
+ *
+ * Ordena por ATE ONDE A DUPLA CHEGOU, nao por vitorias: com bye, quem passou
+ * direto para a semi e perdeu tem uma vitoria a menos que quem ganhou as
+ * quartas e perdeu a semi -- e as duas cairam na mesma altura. A fase mais
+ * alta que a dupla jogou e a medida honesta; vitorias so desempatam dentro
+ * dela, o que separa a campea da vice.
+ *
+ * Recebe so as partidas que valem (fase 2 em diante). Serve tanto ao podio
+ * mostrado na tela quanto ao 🔥 -- de proposito: um podio visivel que nao
+ * bate com o que segura a sequencia e bug esperando para ser reportado.
+ */
+export type DuplaDoDia = DuoStat & {
+  /** A maior `fase` em que a dupla jogou: 2 = caiu na primeira, 4 = final. */
+  ateFase: number
+  saldo: number
+}
+
+export function rankDuplasDoDia(matches: Match[], nameOf: (id: string) => string): DuplaDoDia[] {
+  const stats = duoStats(matches)
+  const ateFase = new Map<string, number>()
+  for (const m of matches) {
+    const fase = m.fase ?? 2
+    for (const time of [m.team_a, m.team_b]) {
+      const k = pairKey(time[0], time[1])
+      ateFase.set(k, Math.max(ateFase.get(k) ?? 0, fase))
+    }
+  }
+  return [...stats.values()]
+    .map((d) => ({ ...d, ateFase: ateFase.get(d.key) ?? 0, saldo: d.gamesWon - d.gamesLost }))
+    .sort(
+      (x, y) =>
+        y.ateFase - x.ateFase ||
+        y.wins - x.wins ||
+        y.points - x.points ||
+        y.saldo - x.saldo ||
+        nameOf(x.a).localeCompare(nameOf(y.a), 'pt-BR'),
+    )
+}
+
+/** Quantas duplas sobem ao podio do mata-mata: ouro, prata e bronze. */
+export const DUPLAS_NO_PODIO = 3

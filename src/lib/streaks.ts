@@ -1,4 +1,12 @@
-import { balance, computeStats, playedMatches, rankPlayers, type PlayerStat } from './stats'
+import {
+  DUPLAS_NO_PODIO,
+  balance,
+  computeStats,
+  playedMatches,
+  rankDuplasDoDia,
+  rankPlayers,
+  type PlayerStat,
+} from './stats'
 import type { AppData, StreakChoice } from './types'
 import { monthOf, todayISO } from './types'
 
@@ -216,7 +224,11 @@ export function computeStreaks(data: AppData): Streaks {
     if (mesCorrente && mes !== mesCorrente) fecharMes(mesCorrente)
     mesCorrente = mes
 
-    const ms = playedMatches(data, { sessionId: s.id })
+    const todas = playedMatches(data, { sessionId: s.id })
+    // no grupos+duplas a fase de grupos so serviu para formar as duplas:
+    // ela nao pontua, entao nao pode decidir quem sobe ao podio
+    const soFase2 = s.format === 'grupos-duplas'
+    const ms = soFase2 ? todas.filter((m) => (m.fase ?? 1) >= 2) : todas
     if (ms.length === 0) continue
     const rank = rankPlayers(computeStats(ms), nameOf)
     if (rank.length === 0) continue
@@ -228,10 +240,22 @@ export function computeStreaks(data: AppData): Streaks {
     )
     winnersOf.set(s.id, champions.map((c) => c.player_id))
 
-    // podio do dia -- um por grupo, quando o play e em grupos
-    const noPodio = new Set(
-      podiosDoDia(rank, s.groups).flatMap((p) => p.rows.map((x) => x.player_id)),
-    )
+    /*
+     * Podio do dia.
+     *
+     * No grupos+duplas quem decide o dia e a DUPLA, e os grupos ja se
+     * misturaram no mata-mata -- entao nao ha podio por grupo: sobem as tres
+     * duplas medalhistas, com os dois de cada uma. Sao 6 de 16 num play
+     * tipico (37%), menos generoso que o modo em grupos, onde 4 grupos de 4
+     * ja levam 8 ao podio.
+     */
+    const noPodio = soFase2
+      ? new Set(
+          rankDuplasDoDia(ms, nameOf)
+            .slice(0, DUPLAS_NO_PODIO)
+            .flatMap((d) => [d.a, d.b]),
+        )
+      : new Set(podiosDoDia(rank, s.groups).flatMap((p) => p.rows.map((x) => x.player_id)))
     podiumOf.set(s.id, [...noPodio])
 
     const jogaram = new Set<string>()

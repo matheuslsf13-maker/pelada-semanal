@@ -27,10 +27,11 @@ import { dayRankingText, scheduleText } from '../lib/share'
 import { isPlayed, matchPoints } from '../lib/scoring'
 import { loadFins, loadInicios, saveFins, saveInicios, type Horarios } from '../lib/emQuadra'
 import {
+  DUPLAS_NO_PODIO,
   balance,
   buildHistory,
   computeStats,
-  duoStats,
+  rankDuplasDoDia,
   pairKey,
   playedMatches,
   ratings,
@@ -1629,7 +1630,7 @@ function PlayDetail({
             </>
           ) : (
             <>
-              Campeãs do dia: <strong>{vivas[0] ? vivas[0].map(nameOf).join(' + ') : '—'}</strong>.
+              Campeões do dia: <strong>{vivas[0] ? vivas[0].map(nameOf).join(' + ') : '—'}</strong>.
             </>
           )}
         </div>
@@ -2789,44 +2790,51 @@ function ResolverCadastro({
 
 
 /**
- * O ranking das duplas do mata-mata.
+ * O mata-mata do dia: o podio e a campanha de cada dupla.
  *
- * Ordena por ATE ONDE A DUPLA CHEGOU, nao por vitorias: com bye, quem passou
- * direto para a semi e perdeu tem uma vitoria a menos que quem ganhou as
- * quartas e perdeu a semi -- e as duas cairam na mesma altura. A fase mais
- * alta que a dupla jogou e a medida honesta; vitorias so desempatam dentro
- * dela, o que separa a campea da vice.
+ * A ordem sai de `rankDuplasDoDia`, a mesma que decide quem segura o 🔥 --
+ * um podio na tela que nao bate com o que vale para a sequencia seria bug
+ * esperando para ser reportado.
  */
 function DuplasDoDia({ partidas }: { partidas: Match[] }) {
   const { nameOf, playerById } = useStore()
-
-  const linhas = useMemo(() => {
-    const stats = duoStats(partidas)
-    const ateFase = new Map<string, number>()
-    for (const m of partidas) {
-      const fase = m.fase ?? 2
-      for (const time of [m.team_a, m.team_b]) {
-        const k = pairKey(time[0], time[1])
-        ateFase.set(k, Math.max(ateFase.get(k) ?? 0, fase))
-      }
-    }
-    return [...stats.values()]
-      .map((d) => ({ ...d, ateFase: ateFase.get(d.key) ?? 0, saldo: d.gamesWon - d.gamesLost }))
-      .sort(
-        (x, y) =>
-          y.ateFase - x.ateFase ||
-          y.wins - x.wins ||
-          y.points - x.points ||
-          y.saldo - x.saldo ||
-          nameOf(x.a).localeCompare(nameOf(y.a), 'pt-BR'),
-      )
-  }, [partidas, nameOf])
-
+  const linhas = useMemo(() => rankDuplasDoDia(partidas, nameOf), [partidas, nameOf])
   if (linhas.length === 0) return null
+
+  const medalhas = ['🥇', '🥈', '🥉']
+  const podio = linhas.slice(0, DUPLAS_NO_PODIO)
 
   return (
     <>
-      <div className="section-title" style={{ fontSize: 13 }}>🤝 As duplas do mata-mata</div>
+      <div className="section-title" style={{ fontSize: 13 }}>🏆 Pódio do dia</div>
+      <div className="stack" style={{ gap: 8 }}>
+        {podio.map((d, i) => (
+          <div key={d.key} className={`podio-dupla p${i + 1}`}>
+            <span style={{ fontSize: 22 }}>{medalhas[i]}</span>
+            <Avatar player={playerById(d.a)} size={30} />
+            <Avatar player={playerById(d.b)} size={30} />
+            <span className="grow" style={{ minWidth: 0 }}>
+              <strong className="ellipsis" style={{ display: 'block' }}>
+                {nameOf(d.a)} + {nameOf(d.b)}
+              </strong>
+              <span className="tiny muted">
+                {i === 0 && d.losses === 0
+                  ? 'dupla campeã do dia'
+                  : `caiu ${d.ateFase === 4 ? 'na final' : d.ateFase === 3 ? 'na semifinal' : 'nas quartas'}`}{' '}
+                · {d.wins}V {d.losses}D
+              </span>
+            </span>
+            <span className="nowrap" style={{ fontWeight: 800 }}>{d.points} pts</span>
+          </div>
+        ))}
+      </div>
+      <p className="tiny muted" style={{ marginTop: 6 }}>
+        Quem está nestas três duplas segura a sequência 🔥 do dia.
+      </p>
+
+      <div className="section-title" style={{ fontSize: 13, marginTop: 14 }}>
+        🤝 Todas as duplas do mata-mata
+      </div>
       <div className="scroll-x">
         <table className="table">
           <thead>
@@ -2850,7 +2858,6 @@ function DuplasDoDia({ partidas }: { partidas: Match[] }) {
                     <span className="ellipsis">
                       {nameOf(d.a)} + {nameOf(d.b)}
                     </span>
-                    {i === 0 && d.losses === 0 && <span title="campeã do dia">🏆</span>}
                   </div>
                 </td>
                 <td>{d.wins}</td>
@@ -2863,14 +2870,13 @@ function DuplasDoDia({ partidas }: { partidas: Match[] }) {
         </table>
       </div>
       <p className="tiny muted" style={{ marginTop: 6 }}>
-        A ordem é até onde a dupla chegou; vitórias e saldo só desempatam dentro da mesma fase.
-        Na tabela individual os dois de uma dupla empatam em tudo — ganharam e perderam as mesmas
-        partidas —, e é por isso que a dupla é a medida do dia aqui.
+        A ordem é até onde a dupla chegou; vitórias e saldo só desempatam dentro da mesma
+        fase. Na tabela individual os dois de uma dupla empatam em tudo — ganharam e perderam
+        as mesmas partidas —, e é por isso que a dupla é a medida do dia aqui.
       </p>
     </>
   )
 }
-
 
 /**
  * Placar digitado na mao, para o que os botoes nao cobrem.
@@ -2939,11 +2945,7 @@ function PlacarManual({
 
       <div className="row" style={{ gap: 8, marginTop: 10 }}>
         <button className="btn ghost grow sm" onClick={onCancelar}>Cancelar</button>
-        <button
-          className="btn marca grow sm"
-          disabled={!ok}
-          onClick={() => onConfirmar(a, b)}
-        >
+        <button className="btn marca grow sm" disabled={!ok} onClick={() => onConfirmar(a, b)}>
           Confirmar {ok ? `${a}x${b}` : ''}
         </button>
       </div>

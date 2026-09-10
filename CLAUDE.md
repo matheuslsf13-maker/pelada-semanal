@@ -93,7 +93,13 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     cima em vez de num nível diferente. Parceiro nunca é do mesmo grupo. As
     duplas viram **chaves** e jogam só dentro da chave.
   - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Montar as duplas e a chave"), porque depende da colocação final.
-  - **Só a fase 2 vale pontos** no pódio do dia, e o pódio é **por chave**.
+  - **Só a fase 2 vale pontos**, e o **pódio é das DUPLAS**: 🥇 campeã, 🥈 vice e
+    🥉 a melhor semifinalista. Quem decide o dia é a dupla, e os grupos já se
+    misturaram no mata-mata — não há pódio por grupo aqui. **O 🔥 segue esse mesmo
+    pódio** (`rankDuplasDoDia`, compartilhado com a tela): são 6 de 16 num play típico,
+    menos generoso que o modo em grupos, onde 4 grupos de 4 já levam 8 ao pódio.
+    ⚠️ `computeStreaks` **descarta a fase 1** neste formato: ela não pontua, então não
+    pode decidir quem segura a sequência.
   - **O mata-mata tem tamanho alvo em duplas** (`sessions.duplas_mm`, padrão 8 =
     16 atletas = quartas). Sobrando gente, os **piores colocados da fase de
     grupos ficam de fora**: com 20 atletas saem 4 e ficam 16. Faltando, todos

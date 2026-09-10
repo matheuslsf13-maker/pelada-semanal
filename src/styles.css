@@ -1186,3 +1186,18 @@ textarea.input { line-height: 1.45; }
 }
 .placar-manual .field > span { font-size: 10.5px; }
 .game-btn.manual { border-style: dashed; }
+
+/* podio do mata-mata: ouro, prata e bronze, por dupla */
+.podio-dupla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-2);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--card-2);
+}
+.podio-dupla.p1 { border-left-color: var(--ouro); background: var(--ouro-suave); }
+.podio-dupla.p2 { border-left-color: var(--line-2); }
+.podio-dupla.p3 { border-left-color: var(--bronze); }
