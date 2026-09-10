@@ -170,3 +170,43 @@ export function resumoDaFase(alvo: number, valor: string): string {
   if (r.modo === 'vantagem') return `até ${alvo}, e no ${empate} segue até abrir 2`
   return `até ${alvo}, vai a 2 e, no ${alvo}x${alvo}, tie de ${r.tie}`
 }
+
+/* -------------------------------------------------------------------------
+   O PLACAR DO PROPRIO TIE
+
+   O tie decide o game que fecha, entao ele nao aparece no placar em games --
+   uma partida de 4 que foi ao tie fica 5x4 e pronto. So que "ganhou no tie
+   por 10x8" e parte do que aconteceu, e ate aqui isso se perdia.
+
+   Guardamos so os pontos do PERDEDOR (`matches.tie`). Os do vencedor saem da
+   regra, que e sempre a mesma: chega no alvo do tie, ou abre dois.
+   ------------------------------------------------------------------------- */
+
+/** Este placar em games quer dizer que o tie decidiu? */
+export function decidiuNoTie(alvo: number, r: Regra, doPerdedor: number): boolean {
+  if (r.tieDireto) return doPerdedor === alvo - 1
+  if (!temTeto(r)) return false
+  return doPerdedor === alvo
+}
+
+/** Quantos pontos o vencedor fez no tie, dado quanto o perdedor fez. */
+export function pontosDoVencedorNoTie(r: Regra, doPerdedor: number): number {
+  const alvo = r.tie
+  // o tie sempre vai a 2: 7x5 fecha, 7x6 nao
+  return doPerdedor <= alvo - 2 ? alvo : doPerdedor + 2
+}
+
+/**
+ * Os pontos que o perdedor pode ter feito no tie.
+ *
+ * Vai ate `alvo + 3` porque o tie tambem se arrasta: num tie de 7, o 9x7 e o
+ * 10x8 existem. Alem dali e raro o bastante para o ✏️ resolver.
+ */
+export function pontosDoPerdedorNoTie(r: Regra): number[] {
+  return Array.from({ length: r.tie + 4 }, (_, n) => n)
+}
+
+/** "10x8", para mostrar na lista de partidas jogadas. */
+export function placarDoTie(r: Regra, doPerdedor: number): string {
+  return `${pontosDoVencedorNoTie(r, doPerdedor)}x${doPerdedor}`
+}

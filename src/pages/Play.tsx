@@ -44,8 +44,12 @@ import {
   TIES,
   escreverRegra,
   explicarRegra,
+  decidiuNoTie,
   gamesDoPerdedor,
   gamesDoVencedor,
+  placarDoTie,
+  pontosDoPerdedorNoTie,
+  pontosDoVencedorNoTie,
   lerRegra,
   resumoDaFase,
   type Modo,
@@ -1365,7 +1369,7 @@ function PlayDetail({
     return porPartida
   }, [matches, nameOf])
 
-  function setScore(m: Match, a: number | null, b: number | null) {
+  function setScore(m: Match, a: number | null, b: number | null, tie?: number | null) {
     // lancar o placar tambem encerra a partida: a quadra fica livre de novo
     const encerrando = a !== null && b !== null
     // corrigir um placar antigo nao muda a hora em que a partida terminou:
@@ -1373,7 +1377,10 @@ function PlayDetail({
     const fim = encerrando ? m.ended_at ?? fins[m.id] ?? new Date().toISOString() : null
     marcarInicio(m.id, null)
     marcarFim(m.id, fim)
-    saveMatches([{ ...m, score_a: a, score_b: b, started_at: null, ended_at: fim }])
+    // `tie` vem so quando a partida foi decidida no tie; apagar o placar limpa
+    saveMatches([
+      { ...m, score_a: a, score_b: b, tie: encerrando ? tie ?? null : null, started_at: null, ended_at: fim },
+    ])
   }
 
   /** Botao "partida iniciada": e a partir daqui que o app sabe quem esta em quadra. */
@@ -1720,6 +1727,7 @@ function PlayDetail({
         repetidas={duplasRepetidas}
         emQuadra={ocupados}
         alvoDe={alvoDe}
+        desempateDe={regraDe}
         editable={editable}
         onCorrigir={(m) => setCorrigindo(m)}
       />
@@ -1776,7 +1784,7 @@ function PlayDetail({
           target={alvoDe(corrigindo)}
           desempate={regraDe(corrigindo)}
           onClose={() => setCorrigindo(null)}
-          onScore={(a, b) => { setScore(corrigindo, a, b); setCorrigindo(null) }}
+          onScore={(a, b, tie) => { setScore(corrigindo, a, b, tie); setCorrigindo(null) }}
         />
       )}
 
@@ -2060,7 +2068,7 @@ function MatchCard({
   repetida: boolean
   espera: Map<string, number>
   jogadoresDoPlay: string[]
-  onScore: (m: Match, a: number | null, b: number | null) => void
+  onScore: (m: Match, a: number | null, b: number | null, tie?: number | null) => void
   onIniciar: () => void
   onCancelarInicio: () => void
   onTrocar: (sai: string, entra: string) => void
@@ -2068,6 +2076,8 @@ function MatchCard({
 }) {
   const { nameOf } = useStore()
   const [winner, setWinner] = useState<'a' | 'b' | null>(null)
+  /** Escolheu o placar em games decidido no tie; falta o placar do tie. */
+  const [noTie, setNoTie] = useState<{ venceu: number; perdeu: number } | null>(null)
   const [trocando, setTrocando] = useState(false)
   const noTime = jogadoresDaPartida(match)
   // com um grupo so a cor nao diz nada; com varios e o que identifica a quadra
@@ -2114,6 +2124,42 @@ function MatchCard({
     )
   }
 
+  // o tie tem placar proprio, entao ele e um passo a parte
+  if (winner && noTie) {
+    const loserIds = winner === 'a' ? match.team_b : match.team_a
+    return (
+      <div className={`match live ${corDoGrupo}`}>
+        <div className="match-head">
+          <span>Quadra {quadra}</span>
+          <button className="linkish" onClick={() => setNoTie(null)}>‹ voltar</button>
+        </div>
+        <div className="ask" style={{ marginTop: 0 }}>
+          Quantos pontos <strong>{nameOf(loserIds[0])} + {nameOf(loserIds[1])}</strong> fez no tie?
+        </div>
+        <div className="games-row">
+          {pontosDoPerdedorNoTie(desempate).map((p) => (
+            <button
+              key={p}
+              className="game-btn"
+              title={`${pontosDoVencedorNoTie(desempate, p)}x${p}`}
+                onClick={() => {
+                  const a = winner === 'a' ? noTie.venceu : noTie.perdeu
+                  const b = winner === 'a' ? noTie.perdeu : noTie.venceu
+                  setNoTie(null)
+                  setWinner(null)
+                  onScore(match, a, b, p)
+                }}
+            >
+              {pontosDoVencedorNoTie(desempate, p) === desempate.tie
+                ? p
+                : placarDoTie(desempate, p)}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   // ---- passo 2: quantos games o perdedor fez ----
   if (winner) {
     const loserIds = winner === 'a' ? match.team_b : match.team_a
@@ -2134,15 +2180,28 @@ function MatchCard({
             return (
               <button
                 key={n}
-                className="game-btn"
-                title={`${venceu}x${n}`}
+                className={`game-btn${decidiuNoTie(target, desempate, n) ? ' no-tie' : ''}`}
+                title={
+                  decidiuNoTie(target, desempate, n)
+                    ? `${venceu}x${n}, decidida no tie`
+                    : `${venceu}x${n}`
+                }
                 onClick={() => {
+                  // o tie tem placar proprio: pergunta antes de gravar
+                  if (decidiuNoTie(target, desempate, n)) {
+                    setNoTie({ venceu, perdeu: n })
+                    return
+                  }
                   setWinner(null)
                   if (winner === 'a') onScore(match, venceu, n)
                   else onScore(match, n, venceu)
                 }}
               >
-                {venceu === target ? n : `${venceu}x${n}`}
+                {decidiuNoTie(target, desempate, n)
+                  ? '🎯 tie'
+                  : venceu === target
+                    ? n
+                    : `${venceu}x${n}`}
               </button>
             )
           })}
@@ -2214,6 +2273,7 @@ function ListaDePartidas({
   repetidas,
   emQuadra,
   alvoDe,
+  desempateDe,
   editable,
   onCorrigir,
 }: {
@@ -2232,6 +2292,8 @@ function ListaDePartidas({
   emQuadra: Set<string>
   /** Pontos que fecham a partida; cada fase pode ter o seu. */
   alvoDe?: (m: Match) => number
+  /** A regra do empate de cada partida, para escrever o placar do tie. */
+  desempateDe?: (m: Match) => Regra
   editable?: boolean
   onCorrigir?: (m: Match) => void
 }) {
@@ -2286,6 +2348,11 @@ function ListaDePartidas({
                     {jogada && <b> {m.score_b}</b>}
                     {jogada && pb > 0 && <i> +{pb}</i>}
                   </span>
+                  {jogada && m.tie != null && desempateDe && (
+                    <span className="tiny nowrap tie-tag" title="decidida no tie">
+                      🎯 {placarDoTie(desempateDe(m), m.tie)}
+                    </span>
+                  )}
                   {repetidas.has(m.id) && (
                     <span className="tiny muted">
                       🔁 {(repetidas.get(m.id) as string[]).join(' e ')}{' '}
@@ -2340,11 +2407,43 @@ function CorrigirPlacar({
   match: Match
   target: number
   desempate: Regra
-  onScore: (a: number | null, b: number | null) => void
+  onScore: (a: number | null, b: number | null, tie?: number | null) => void
   onClose: () => void
 }) {
   const { nameOf } = useStore()
   const [winner, setWinner] = useState<'a' | 'b' | null>(null)
+  const [noTie, setNoTie] = useState<{ venceu: number; perdeu: number } | null>(null)
+
+  // o tie tem placar proprio, entao ele e um passo a parte tambem aqui
+  if (winner && noTie) {
+    const perdedors = winner === 'a' ? match.team_b : match.team_a
+    return (
+      <Modal title="Quantos pontos no tie?" onClose={onClose}>
+        <button className="btn ghost sm" style={{ marginBottom: 10 }} onClick={() => setNoTie(null)}>
+          ‹ voltar
+        </button>
+        <div className="ask" style={{ marginTop: 0 }}>
+          <strong>{nameOf(perdedors[0])} + {nameOf(perdedors[1])}</strong>
+        </div>
+        <div className="games-row">
+          {pontosDoPerdedorNoTie(desempate).map((p) => (
+            <button
+              key={p}
+              className="game-btn"
+              title={`${pontosDoVencedorNoTie(desempate, p)}x${p}`}
+              onClick={() =>
+                winner === 'a'
+                  ? onScore(noTie.venceu, noTie.perdeu, p)
+                  : onScore(noTie.perdeu, noTie.venceu, p)
+              }
+            >
+              {pontosDoVencedorNoTie(desempate, p) === desempate.tie ? p : placarDoTie(desempate, p)}
+            </button>
+          ))}
+        </div>
+      </Modal>
+    )
+  }
 
   if (winner) {
     const perdedors = winner === 'a' ? match.team_b : match.team_a
@@ -2362,11 +2461,21 @@ function CorrigirPlacar({
             return (
             <button
               key={n}
-              className="game-btn"
+              className={`game-btn${decidiuNoTie(target, desempate, n) ? ' no-tie' : ''}`}
               title={`${venceu}x${n}`}
-              onClick={() => (winner === 'a' ? onScore(venceu, n) : onScore(n, venceu))}
+              onClick={() => {
+                if (decidiuNoTie(target, desempate, n)) {
+                  setNoTie({ venceu, perdeu: n })
+                  return
+                }
+                winner === 'a' ? onScore(venceu, n) : onScore(n, venceu)
+              }}
             >
-              {venceu === target ? n : `${venceu}x${n}`}
+              {decidiuNoTie(target, desempate, n)
+                ? '🎯 tie'
+                : venceu === target
+                  ? n
+                  : `${venceu}x${n}`}
             </button>
             )
           })}

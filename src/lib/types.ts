@@ -108,6 +108,13 @@ export type Match = {
   score_a: number | null
   score_b: number | null
   /**
+   * Pontos que o PERDEDOR fez no tie, quando a partida foi decidida nele.
+   *
+   * So o perdedor: os do vencedor saem da regra, que e sempre a mesma -- chega
+   * no alvo do tie, ou abre dois. Nulo quando nao houve tie.
+   */
+  tie?: number | null
+  /**
    * Em que fase do play a partida acontece. 1 = fase de grupos, 2 = fase das
    * duplas fixas. So o formato `grupos-duplas` usa a 2; ausente conta como 1.
    */

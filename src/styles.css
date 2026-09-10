@@ -1166,3 +1166,11 @@ textarea.input { line-height: 1.45; }
   font-weight: 800;
   margin-right: 4px;
 }
+
+/* o botao que abre o passo do tie, e a marca dele na lista de jogadas */
+.game-btn.no-tie {
+  border-color: var(--ouro);
+  color: var(--ouro);
+  font-weight: 800;
+}
+.tie-tag { color: var(--ouro); font-weight: 800; }

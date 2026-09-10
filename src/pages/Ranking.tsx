@@ -32,7 +32,7 @@ import {
   STREAK_LADDER,
   streakLevel,
 } from '../lib/streaks'
-import { rankingDeForca } from '../lib/forca'
+import { forcaDeDuplas, rankingDeForca } from '../lib/forca'
 import { useStore } from '../lib/store'
 import { dateLabel, monthLabel, monthOf, todayISO, type MonthClosure } from '../lib/types'
 
@@ -535,51 +535,116 @@ export function RankTable({ rows, fire }: { rows: PlayerStat[]; fire?: Map<strin
 
 
 /**
- * Os cinco mais fortes, na tela inicial.
+ * A forca na tela inicial: individual ou por dupla, cinco de cada vez.
  *
- * Nao e o ranking do mes -- o ranking soma pontos e zera na virada, a forca
- * atravessa o ano e mede COM QUEM voce ganhou. Sao duas leituras diferentes do
- * grupo, e por isso ficam em cartoes separados, com o aviso no rodape.
+ * As duas medem coisas diferentes e ninguem precisa das duas ao mesmo tempo,
+ * entao sao uma escolha e nao duas listas empilhadas -- a tela inicial ja tem
+ * o ranking do mes, o proximo play e o status.
  */
 function TopDaForca({ onVerTudo }: { onVerTudo?: () => void }) {
   const { data, nameOf, playerById } = useStore()
-  const linhas = useMemo(() => rankingDeForca(data, nameOf), [data, nameOf])
-  if (linhas.length === 0) return null
+  const [modo, setModo] = useState<'individual' | 'duplas'>('individual')
 
-  const topo = linhas.slice(0, 5)
+  const individuais = useMemo(() => rankingDeForca(data, nameOf), [data, nameOf])
+  const duplas = useMemo(
+    () =>
+      [...forcaDeDuplas(data).values()].sort(
+        (a, b) => b.nota - a.nota || nameOf(a.a).localeCompare(nameOf(b.a), 'pt-BR'),
+      ),
+    [data, nameOf],
+  )
+
+  const total = modo === 'individual' ? individuais.length : duplas.length
+  if (individuais.length === 0) return null
+
   return (
     <div className="card">
-      <div className="section-title">💪 Força do grupo</div>
-      <div className="stack" style={{ gap: 8 }}>
-        {topo.map((l, i) => (
-          <div key={l.player_id} className="row" style={{ gap: 8 }}>
-            <span className={`rank-pos top${i + 1}`} style={{ fontWeight: 800, minWidth: 22 }}>
-              {i + 1}
-            </span>
-            <Avatar player={playerById(l.player_id)} size={28} />
-            <span className="grow ellipsis">{nameOf(l.player_id)}</span>
-            <span className="nowrap tiny" style={{ color: l.nivel.cor, fontWeight: 800 }}>
-              {l.nivel.emoji} {l.nivel.titulo}
-            </span>
-            <span
-              className="nowrap"
-              style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}
-            >
-              {l.nota}
-            </span>
-          </div>
-        ))}
+      <div className="section-title">💪 Força</div>
+
+      <div className="segmented" style={{ marginBottom: 10 }}>
+        <button
+          className={modo === 'individual' ? 'on' : ''}
+          onClick={() => setModo('individual')}
+        >
+          👤 Individual
+        </button>
+        <button className={modo === 'duplas' ? 'on' : ''} onClick={() => setModo('duplas')}>
+          🤝 Duplas
+        </button>
       </div>
 
-      {linhas.length > 5 && onVerTudo && (
+      {modo === 'duplas' && duplas.length === 0 ? (
+        <p className="tiny muted" style={{ margin: 0 }}>
+          Nenhuma dupla jogou junta ainda.
+        </p>
+      ) : (
+        <div className="stack" style={{ gap: 8 }}>
+          {modo === 'individual'
+            ? individuais.slice(0, 5).map((l, i) => (
+                <div key={l.player_id} className="row" style={{ gap: 8 }}>
+                  <span className={`rank-pos top${i + 1}`} style={{ fontWeight: 800, minWidth: 22 }}>
+                    {i + 1}
+                  </span>
+                  <Avatar player={playerById(l.player_id)} size={28} />
+                  <span className="grow ellipsis">{nameOf(l.player_id)}</span>
+                  <span className="nowrap tiny" style={{ color: l.nivel.cor, fontWeight: 800 }}>
+                    {l.nivel.emoji}
+                  </span>
+                  <span
+                    className="nowrap"
+                    style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {l.nota}
+                  </span>
+                </div>
+              ))
+            : duplas.slice(0, 5).map((d, i) => (
+                <div key={d.key} className="row" style={{ gap: 8 }}>
+                  <span className={`rank-pos top${i + 1}`} style={{ fontWeight: 800, minWidth: 22 }}>
+                    {i + 1}
+                  </span>
+                  <Avatar player={playerById(d.a)} size={24} />
+                  <Avatar player={playerById(d.b)} size={24} />
+                  <span className="grow ellipsis">
+                    {nameOf(d.a)} + {nameOf(d.b)}
+                  </span>
+                  {d.entrosamento !== 0 && (
+                    <span className="nowrap tiny muted">
+                      {d.entrosamento > 0 ? '+' : ''}
+                      {d.entrosamento} juntos
+                    </span>
+                  )}
+                  <span
+                    className="nowrap"
+                    style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {d.nota}
+                  </span>
+                </div>
+              ))}
+        </div>
+      )}
+
+      {total > 5 && onVerTudo && (
         <button className="btn ghost block sm" style={{ marginTop: 10 }} onClick={onVerTudo}>
-          Ver a força dos {linhas.length} jogadores →
+          {modo === 'individual'
+            ? `Ver os ${total} jogadores →`
+            : `Ver as ${total} duplas →`}
         </button>
       )}
 
       <p className="tiny muted" style={{ marginTop: 8, marginBottom: 0 }}>
-        Não é o ranking do mês: a força atravessa o ano e mede <strong>com quem</strong> você
-        ganhou. É ela que monta os grupos e escolhe as duplas. 1500 é a média do grupo.
+        {modo === 'individual' ? (
+          <>
+            Não é o ranking do mês: o ranking soma pontos e zera na virada, a força atravessa o
+            ano. 1500 é a média.
+          </>
+        ) : (
+          <>
+            A força da dupla parte da média das duas e muda com o que elas rendem{' '}
+            <strong>juntos</strong> — e é isso que o app usa para escolher os confrontos.
+          </>
+        )}
       </p>
     </div>
   )
