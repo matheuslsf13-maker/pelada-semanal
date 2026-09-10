@@ -501,7 +501,7 @@ function SinalDePagamento({ jogador }: { jogador: Player }) {
       <span className="nowrap" style={{ color: cor, fontWeight: 800 }}>
         ● {sit.rotulo}
       </span>
-      {canEdit && categoria !== 'convidado' && (
+      {canEdit && categoria !== 'convidado' && categoria !== 'isento' && (
         <>
           {' · '}
           <button

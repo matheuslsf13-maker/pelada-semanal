@@ -23,7 +23,7 @@ alter table public.players
 
 alter table public.players
   add constraint players_categoria_check
-    check (categoria in ('mensalista', 'avulso', 'convidado'));
+    check (categoria in ('mensalista', 'avulso', 'convidado', 'isento'));
 
 -- Mensalista: ate que mes esta pago, no formato AAAA-MM.
 alter table public.players
@@ -39,3 +39,10 @@ comment on column public.players.pago_mes is
   'mensalista: ate que mes esta pago (AAAA-MM). Comparado com o mes de hoje';
 comment on column public.players.pago_avulso is
   'avulso: credito de UMA participacao, gasto ao finalizar o play';
+
+-- ------------------------------------------------------------
+--  Quarta categoria: isento.
+--  Nao paga e nunca vira alerta -- para quem tem acordo permanente, e para
+--  o grupo que simplesmente nao cobra (todo mundo isento, portao desligado).
+--  Rode de novo mesmo se ja rodou: o `drop constraint if exists` acima cuida.
+-- ------------------------------------------------------------

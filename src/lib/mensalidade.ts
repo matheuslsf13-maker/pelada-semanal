@@ -20,7 +20,7 @@ import { monthOf, todayISO } from './types'
  * "virar o mes" para dar errado, esquecer de rodar ou rodar duas vezes.
  */
 
-export type Categoria = 'mensalista' | 'avulso' | 'convidado'
+export type Categoria = 'mensalista' | 'avulso' | 'convidado' | 'isento'
 
 export const CATEGORIAS: { valor: Categoria; rotulo: string; explica: string }[] = [
   {
@@ -37,6 +37,11 @@ export const CATEGORIAS: { valor: Categoria; rotulo: string; explica: string }[]
     valor: 'convidado',
     rotulo: '🤝 Convidado',
     explica: 'não paga; dois plays seguidos acendem um alerta',
+  },
+  {
+    valor: 'isento',
+    rotulo: '🎫 Isento',
+    explica: 'não paga e nunca alerta — para quem tem acordo, e para grupo que não cobra',
   },
 ]
 
@@ -81,6 +86,12 @@ export function playsSeguidos(data: AppData, playerId: string): number {
 export function situacaoDoAtleta(p: Player, data: AppData, hoje = todayISO()): Situacao {
   const categoria = categoriaDe(p)
   const mes = monthOf(hoje)
+
+  // isento nao paga e nao vira alerta: o acordo e permanente, entao contar
+  // plays seguidos so encheria a tela de aviso que ninguem vai resolver
+  if (categoria === 'isento') {
+    return { liberado: true, cor: 'ok', rotulo: 'Isento' }
+  }
 
   if (categoria === 'convidado') {
     const seguidos = playsSeguidos(data, p.id)
