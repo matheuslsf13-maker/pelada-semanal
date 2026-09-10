@@ -34,7 +34,7 @@ alter table public.players
   add column if not exists pago_avulso boolean not null default false;
 
 comment on column public.players.categoria is
-  'como o atleta paga: mensalista (por mes), avulso (por play) ou convidado (nao paga)';
+  'como o atleta paga: mensalista, avulso, convidado (nao paga) ou isento (nao paga e nao alerta)';
 comment on column public.players.pago_mes is
   'mensalista: ate que mes esta pago (AAAA-MM). Comparado com o mes de hoje';
 comment on column public.players.pago_avulso is
