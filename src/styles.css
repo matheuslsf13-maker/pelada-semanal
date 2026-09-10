@@ -1201,3 +1201,24 @@ textarea.input { line-height: 1.45; }
 .podio-dupla.p1 { border-left-color: var(--ouro); background: var(--ouro-suave); }
 .podio-dupla.p2 { border-left-color: var(--line-2); }
 .podio-dupla.p3 { border-left-color: var(--bronze); }
+
+/* a rodada do mata-mata, na quadra */
+.rodada-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  background: var(--marca-suave);
+  color: var(--marca);
+  vertical-align: middle;
+}
+
+/* quem ja pode ir embora */
+.banner.livres {
+  background: var(--verde-suave);
+  color: var(--verde);
+  border: 1px solid var(--verde);
+  margin-bottom: 10px;
+}
