@@ -93,6 +93,13 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     cima em vez de num nível diferente. Parceiro nunca é do mesmo grupo. As
     duplas viram **chaves** e jogam só dentro da chave.
   - A fase 2 **só nasce quando a fase 1 inteira tem placar** (botão "Montar as duplas e a chave"), porque depende da colocação final.
+  - **A disputa de 3º lugar** sai junto com a final: as duas que perderam a
+    semifinal jogam entre si, **na mesma fase** e em paralelo, na quadra ao lado
+    — por isso não alonga a noite. Ela tem marca própria (`matches.disputa_3o`)
+    porque o app conta **quantas partidas tem a fase** para saber que rodada é
+    (1 jogo = final, 2 = semi); sem a marca, a fase da final teria dois jogos e
+    viraria “semifinal”. Pelo mesmo motivo ela fica de fora do `ateFase`, senão
+    as semifinalistas subiriam ao degrau das finalistas.
   - **Só a fase 2 vale pontos**, e o **pódio é das DUPLAS**: 🥇 campeã, 🥈 vice e
     🥉 a melhor semifinalista. Quem decide o dia é a dupla, e os grupos já se
     misturaram no mata-mata — não há pódio por grupo aqui. **O 🔥 segue esse mesmo

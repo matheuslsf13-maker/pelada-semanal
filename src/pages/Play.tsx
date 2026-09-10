@@ -10,6 +10,7 @@ import {
   nomeDaRodada,
   duplasVivas,
   type Colocacao,
+  type PlannedMatch,
   gerarFila,
   jogadoresDaPartida,
   ordemDeEspera,
@@ -1081,7 +1082,11 @@ function PlayDetail({
     if (!lista?.length) return lerRegra(session.desempate)
     const fase = m.fase ?? 1
     if (fase === 1) return lerRegra(lista[0])
-    const jogosNaFase = matches.filter((x) => (x.fase ?? 1) === fase).length
+    // a disputa de 3o nao conta: ela divide a fase com a final, e e o
+    // numero de jogos da fase que diz qual rodada e (1 = final, 2 = semi)
+    const jogosNaFase = matches.filter(
+      (x) => (x.fase ?? 1) === fase && !x.disputa_3o,
+    ).length
     if (jogosNaFase === 1) return lerRegra(lista[3])
     if (jogosNaFase === 2) return lerRegra(lista[2])
     return lerRegra(lista[1])
@@ -1092,7 +1097,9 @@ function PlayDetail({
     if (!alvos?.length) return session.target
     const fase = m.fase ?? 1
     if (fase === 1) return alvos[0] ?? session.target
-    const jogosNaFase = matches.filter((x) => (x.fase ?? 1) === fase).length
+    const jogosNaFase = matches.filter(
+      (x) => (x.fase ?? 1) === fase && !x.disputa_3o,
+    ).length
     if (jogosNaFase === 1) return alvos[3] ?? session.target
     if (jogosNaFase === 2) return alvos[2] ?? session.target
     return alvos[1] ?? session.target
@@ -1103,7 +1110,11 @@ function PlayDetail({
   /** Todas as partidas do mata-mata (fase 2 em diante), por rodada. */
   const doMataMata = useMemo(() => matches.filter((m) => (m.fase ?? 1) >= 2), [matches])
   const ultimaFase = doMataMata.reduce((t, m) => Math.max(t, m.fase ?? 1), 1)
-  const daUltimaRodada = doMataMata.filter((m) => (m.fase ?? 1) === ultimaFase)
+  // a disputa de 3o fica de fora: ela nao gera proxima rodada nem decide
+  // quem segue vivo na chave
+  const daUltimaRodada = doMataMata.filter(
+    (m) => (m.fase ?? 1) === ultimaFase && !m.disputa_3o,
+  )
   /** Quem ainda nao perdeu. Uma dupla so = ja tem campea. */
   const vivas = useMemo(
     () => (session.duos?.length ? duplasVivas(session.duos, doMataMata) : []),
@@ -1543,7 +1554,32 @@ function PlayDetail({
     }
     const { jogos } = rodadaDoMataMata(vivas)
     const fase = ultimaFase + 1
-    const fila = jogos.map(([a, b]) => ({ team_a: a, team_b: b, grupo: 0, fase }))
+    const fila: PlannedMatch[] = jogos.map(([a, b]) => ({ team_a: a, team_b: b, grupo: 0, fase }))
+
+    /*
+     * Vai sair a FINAL? Entao as duas que perderam a semi jogam o 3o lugar.
+     *
+     * Na mesma fase, para nao ficarem "acima" das finalistas na hora de
+     * medir ate onde cada dupla chegou -- e marcada, para o app nao contar
+     * essa partida como se a fase tivesse duas rodadas. Roda em paralelo com
+     * a final, na quadra ao lado, entao nao alonga a noite.
+     */
+    if (vivas.length === 2) {
+      const perdedoras = daUltimaRodada
+        .filter(isPlayed)
+        .map((m) =>
+          ((m.score_a as number) > (m.score_b as number) ? m.team_b : m.team_a) as [string, string],
+        )
+      if (perdedoras.length === 2) {
+        fila.push({
+          team_a: perdedoras[0],
+          team_b: perdedoras[1],
+          grupo: 0,
+          fase,
+          disputa3o: true,
+        })
+      }
+    }
     const novas = planToMatches(session.id, fila).map((m, i) => ({
       ...m,
       round: matches.length + i + 1,
@@ -2394,6 +2430,11 @@ function ListaDePartidas({
                     {jogada && <b> {m.score_b}</b>}
                     {jogada && pb > 0 && <i> +{pb}</i>}
                   </span>
+                  {m.disputa_3o && (
+                    <span className="tiny nowrap" style={{ color: 'var(--bronze)', fontWeight: 800 }}>
+                      🥉 3º lugar
+                    </span>
+                  )}
                   {jogada && m.tie != null && desempateDe && (
                     <span className="tiny nowrap tie-tag" title="decidida no tie">
                       🎯 {placarDoTie(desempateDe(m), m.tie)}
@@ -2820,7 +2861,9 @@ function DuplasDoDia({ partidas }: { partidas: Match[] }) {
               <span className="tiny muted">
                 {i === 0 && d.losses === 0
                   ? 'dupla campeã do dia'
-                  : `caiu ${d.ateFase === 4 ? 'na final' : d.ateFase === 3 ? 'na semifinal' : 'nas quartas'}`}{' '}
+                  : d.bronze
+                    ? 'venceu a disputa de 3º'
+                    : `caiu ${d.ateFase === 4 ? 'na final' : d.ateFase === 3 ? 'na semifinal' : 'nas quartas'}`}{' '}
                 · {d.wins}V {d.losses}D
               </span>
             </span>

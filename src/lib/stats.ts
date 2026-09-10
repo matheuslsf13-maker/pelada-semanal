@@ -325,23 +325,44 @@ export type DuplaDoDia = DuoStat & {
   /** A maior `fase` em que a dupla jogou: 2 = caiu na primeira, 4 = final. */
   ateFase: number
   saldo: number
+  /** Venceu a disputa de 3o lugar -- o bronze saiu da quadra, nao do desempate. */
+  bronze: boolean
 }
 
 export function rankDuplasDoDia(matches: Match[], nameOf: (id: string) => string): DuplaDoDia[] {
   const stats = duoStats(matches)
   const ateFase = new Map<string, number>()
   for (const m of matches) {
+    // a disputa de 3o divide a fase com a final; contar ela aqui poria as
+    // semifinalistas no mesmo degrau das finalistas
+    if (m.disputa_3o) continue
     const fase = m.fase ?? 2
     for (const time of [m.team_a, m.team_b]) {
       const k = pairKey(time[0], time[1])
       ateFase.set(k, Math.max(ateFase.get(k) ?? 0, fase))
     }
   }
+
+  // quem venceu a disputa de 3o fica na frente da outra semifinalista, e nao
+  // no desempate por pontos: o bronze foi decidido em quadra
+  const bronze = new Set<string>()
+  for (const m of matches) {
+    if (!m.disputa_3o || m.score_a === null || m.score_b === null) continue
+    const venceu = m.score_a > m.score_b ? m.team_a : m.team_b
+    bronze.add(pairKey(venceu[0], venceu[1]))
+  }
+
   return [...stats.values()]
-    .map((d) => ({ ...d, ateFase: ateFase.get(d.key) ?? 0, saldo: d.gamesWon - d.gamesLost }))
+    .map((d) => ({
+      ...d,
+      ateFase: ateFase.get(d.key) ?? 0,
+      saldo: d.gamesWon - d.gamesLost,
+      bronze: bronze.has(d.key),
+    }))
     .sort(
       (x, y) =>
         y.ateFase - x.ateFase ||
+        Number(y.bronze) - Number(x.bronze) ||
         y.wins - x.wins ||
         y.points - x.points ||
         y.saldo - x.saldo ||

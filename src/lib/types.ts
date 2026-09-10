@@ -119,6 +119,15 @@ export type Match = {
    * duplas fixas. So o formato `grupos-duplas` usa a 2; ausente conta como 1.
    */
   fase?: number
+  /**
+   * A disputa de 3o lugar, entre as duas que perderam a semifinal.
+   *
+   * Fica na MESMA fase da final e roda em paralelo com ela, na quadra ao
+   * lado -- por isso nao alonga a noite. Precisa de marca propria porque
+   * senao a fase da final teria duas partidas, e o app usa esse numero
+   * para saber qual rodada e (1 jogo = final, 2 = semifinal).
+   */
+  disputa_3o?: boolean | null
   /** Quando a partida entrou em quadra. Null = ainda nao comecou. */
   started_at?: string | null
   /** Quando o placar foi lancado. Alimenta o "quem esta fora ha mais tempo". */

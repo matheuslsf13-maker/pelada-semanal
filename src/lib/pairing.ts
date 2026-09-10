@@ -31,6 +31,8 @@ export type PlannedMatch = {
   grupo: number
   /** 1 = fase de grupos, 2 = fase das duplas fixas. Ausente conta como 1. */
   fase?: number
+  /** A disputa de 3o lugar, que roda junto com a final. */
+  disputa3o?: boolean
   /**
    * Dupla que joga uma segunda vez porque sobrou uma dupla sem adversaria.
    * Acontece so quando o total de combinacoes do grupo e impar.
@@ -825,6 +827,7 @@ export function planToMatches(sessionId: string, fila: PlannedMatch[]): Match[] 
     round: i + 1, // posicao na fila (a coluna do banco se chama round)
     court: 0, // a quadra e definida quando a partida entra em quadra
     fase: m.fase ?? 1,
+    disputa_3o: m.disputa3o ?? false,
     team_a: m.team_a,
     team_b: m.team_b,
     score_a: null,
