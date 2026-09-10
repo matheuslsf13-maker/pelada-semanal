@@ -98,3 +98,122 @@ export function rankingDeForca(
     })
     .sort((a, b) => b.nota - a.nota || nameOf(a.player_id).localeCompare(nameOf(b.player_id), 'pt-BR'))
 }
+
+/**
+ * A FORCA DE UMA DUPLA: a media das duas.
+ *
+ * Nao e uma conta nova inventada para a tela -- e exatamente o numero que o
+ * app ja usa para montar as partidas: em `ratings()`, a chance de uma dupla
+ * vencer sai da media das notas dos dois. Por isso mostrar a media, e nao a
+ * soma, mantem a escala: 1500 continua sendo "dupla mediana do grupo", e da
+ * para comparar dupla com atleta na mesma regua.
+ */
+export function forcaDaDupla(a: number, b: number): number {
+  return Math.round((a + b) / 2)
+}
+
+/**
+ * A FORCA DE UMA DUPLA, pelo que os dois renderam JUNTOS.
+ *
+ * Nao e a media das duas notas individuais -- essa e so o ponto de partida.
+ * A media diz o que a dupla DEVERIA valer; o que interessa e se, jogando
+ * junto, ela rende mais ou menos do que isso. Tem dupla que se acha em
+ * quadra e tem dupla que atrapalha um ao outro, e isso nao aparece na nota
+ * individual de ninguem.
+ *
+ * A conta:
+ *
+ *   1. o ponto de partida e a media dos dois (`forcaDaDupla`), que ja carrega
+ *      tudo o que o app sabe sobre cada um. Comecar do zero seria jogar fora
+ *      essa informacao e deixar toda dupla nova sem nota nenhuma;
+ *   2. cada partida DELES move a nota pela mesma formula do Elo, comparando
+ *      o resultado com o esperado contra a media da dupla adversaria.
+ *
+ * Entao `nota - base` e o entrosamento: quanto a dupla rendeu alem (ou
+ * aquem) do que a forca dos dois previa.
+ */
+export type ForcaDeDupla = {
+  key: string
+  a: string
+  b: string
+  /** A media dos dois: o que a dupla deveria valer. */
+  base: number
+  /** O que ela vale pelo que renderam juntos. */
+  nota: number
+  /** `nota - base`: positivo quer dizer que rendem mais juntos. */
+  entrosamento: number
+  jogos: number
+  provisoria: boolean
+}
+
+/** Abaixo disto o entrosamento e ruido: poucas partidas juntos. */
+export const JOGOS_PARA_ENTROSAMENTO = 6
+
+const K_DUPLA = 20
+
+export function forcaDeDuplas(data: AppData): Map<string, ForcaDeDupla> {
+  const individuais = ratings(data)
+  const nota = (id: string) => notaDeForca(individuais.get(id) ?? 2)
+  const base = (x: string, y: string) => forcaDaDupla(nota(x), nota(y))
+
+  const out = new Map<string, ForcaDeDupla>()
+  const chave = (d: readonly string[]) => [...d].sort().join('|')
+
+  // as partidas em ordem cronologica: cada uma e avaliada com o que se sabia
+  // ate ali, como no Elo individual
+  const dia = new Map(data.sessions.map((s) => [s.id, s.date]))
+  const jogos = data.matches
+    .filter((m) => m.score_a !== null && m.score_b !== null && dia.has(m.session_id))
+    .sort(
+      (x, y) =>
+        (dia.get(x.session_id) as string).localeCompare(dia.get(y.session_id) as string) ||
+        x.round - y.round,
+    )
+
+  for (const m of jogos) {
+    const ga = m.score_a as number
+    const gb = m.score_b as number
+    if (ga + gb === 0) continue
+    const times: [readonly string[], number, number][] = [
+      [m.team_a, ga, gb],
+      [m.team_b, gb, ga],
+    ]
+    for (const [time, favor, contra] of times) {
+      const k = chave(time)
+      const [x, y] = time as [string, string]
+      const rival = time === m.team_a ? m.team_b : m.team_a
+      let d = out.get(k)
+      if (!d) {
+        const b = base(x, y)
+        d = { key: k, a: x, b: y, base: b, nota: b, entrosamento: 0, jogos: 0, provisoria: true }
+        out.set(k, d)
+      }
+      const esperado = 1 / (1 + Math.pow(10, (base(rival[0], rival[1]) - d.nota) / 400))
+      d.nota += K_DUPLA * (favor / (favor + contra) - esperado)
+      d.jogos++
+    }
+  }
+
+  for (const d of out.values()) {
+    d.nota = Math.round(d.nota)
+    d.entrosamento = d.nota - d.base
+    d.provisoria = d.jogos < JOGOS_PARA_ENTROSAMENTO
+  }
+  return out
+}
+
+/**
+ * O entrosamento na escala do `ratings()` (0 a 4), para o balanceamento.
+ *
+ * So entram as duplas com jogos suficientes: com duas ou tres partidas juntos
+ * o numero e ruido, e usar ruido para escolher confronto piora o equilibrio
+ * em vez de melhorar.
+ */
+export function ajusteDeEntrosamento(data: AppData): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const d of forcaDeDuplas(data).values()) {
+    if (d.provisoria || d.entrosamento === 0) continue
+    out.set(d.key, d.entrosamento / ESCALA)
+  }
+  return out
+}

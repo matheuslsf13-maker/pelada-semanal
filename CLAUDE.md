@@ -152,6 +152,20 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   `JOGOS_PARA_FIRMAR` a nota sai marcada como **provisória**, e quem nunca jogou
   fica fora da lista — a nota dele seria a média por falta de informação, não por
   equilíbrio.
+- **A dupla tem força própria** (`forcaDeDuplas`, aba “🤝 Dupla” em Stats). Não é a
+  média dos dois — essa é só o **ponto de partida**. A partir dela, cada partida
+  **daquela dupla** move a nota pela fórmula do Elo, então `nota − base` é o
+  **entrosamento**: dois medianos que se acham em quadra rendem mais do que a
+  soma das notas diz, e isso não aparece na nota individual de ninguém.
+  Começar do zero em vez da média jogaria fora tudo o que o app já sabe sobre
+  cada um e deixaria toda dupla nova sem nota.
+- **O entrosamento entra no balanceamento** (`ajusteDeEntrosamento` →
+  `ScheduleOptions.entrosamento` → `forcaDuo`). Escolher quem enfrenta quem
+  usando só a média individual ignorava que certas duplas rendem acima disso.
+  Só entram duplas com `JOGOS_PARA_ENTROSAMENTO`+ jogos juntas: com duas ou três
+  partidas o número é ruído, e ruído no confronto piora o equilíbrio em vez de
+  melhorar. O ajuste entra **dobrado** em `forcaDuo` porque lá a conta é a soma
+  das duas notas, e o entrosamento está medido por jogador.
 - **O ranking zera todo mês, o histórico não.** A força que equilibra as duplas e
   divide os grupos sai de `ratings()`, que é um **Elo**: cada partida move a nota
   conforme quem estava do outro lado, então **vencer quem está melhor rende muito

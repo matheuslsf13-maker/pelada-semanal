@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Avatar, Empty, Modal, StatBox } from '../components/ui'
 import {
   avgPoints,
+
   balance,
   computeStats,
   duoMatches,
@@ -15,9 +16,13 @@ import {
   type PairKeyStat,
 } from '../lib/stats'
 import {
+  JOGOS_PARA_ENTROSAMENTO,
   JOGOS_PARA_FIRMAR,
   NIVEIS_DE_FORCA,
+  forcaDeDuplas,
+  nivelDeForca,
   rankingDeForca,
+  type ForcaDeDupla,
   type LinhaDeForca,
 } from '../lib/forca'
 import { matchPoints } from '../lib/scoring'
@@ -290,7 +295,7 @@ function PainelJogador({
 
 /* ---------------------------------------------------------- por dupla */
 
-type Ordem = 'jogos' | 'aproveitamento' | 'pontos'
+type Ordem = 'jogos' | 'aproveitamento' | 'pontos' | 'forca'
 
 function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }) {
   const { nameOf, playerById } = useStore()
@@ -299,6 +304,12 @@ function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }
   const [aberta, setAberta] = useState<DuoStat | null>(null)
 
   const duplas = useMemo(() => [...duoStats(matches).values()], [matches])
+
+  // a forca sai do historico INTEIRO da dupla, e nao do periodo filtrado:
+  // e o que os dois renderam juntos desde sempre
+  const { data } = useStore()
+  const forcas = useMemo(() => forcaDeDuplas(data), [data])
+  const forcaDe = (d: DuoStat) => forcas.get(d.key)?.nota ?? 1500
 
   const lista = useMemo(() => {
     const termo = busca.trim().toLowerCase()
@@ -309,9 +320,11 @@ function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }
     return [...filtradas].sort((a, b) => {
       if (ordem === 'pontos') return b.points - a.points || b.matches - a.matches
       if (ordem === 'aproveitamento') return aprov(b) - aprov(a) || b.matches - a.matches
+      if (ordem === 'forca') return forcaDe(b) - forcaDe(a) || b.matches - a.matches
       return b.matches - a.matches || b.wins - a.wins
     })
-  }, [duplas, busca, ordem, nameOf])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duplas, busca, ordem, nameOf, forcas])
 
   if (duplas.length === 0) {
     return (
@@ -332,7 +345,7 @@ function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }
           onChange={(e) => setBusca(e.target.value)}
         />
         <div className="row" style={{ gap: 6, marginTop: 10 }}>
-          {([['jogos', 'Mais jogos'], ['aproveitamento', 'Melhor %'], ['pontos', 'Mais pontos']] as [Ordem, string][]).map(
+          {([['jogos', 'Mais jogos'], ['aproveitamento', 'Melhor %'], ['pontos', 'Mais pontos'], ['forca', '💪 Mais fortes']] as [Ordem, string][]).map(
             ([id, txt]) => (
               <button key={id} className={`chip ${ordem === id ? 'on' : 'off'}`} onClick={() => setOrdem(id)}>
                 {txt}
@@ -358,7 +371,10 @@ function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }
                   <span className="grow" style={{ minWidth: 0 }}>
                     <span className="duo-nomes ellipsis">{nameOf(d.a)} + {nameOf(d.b)}</span>
                     <span className="mini-barra"><i style={{ width: `${Math.round(pct * 100)}%` }} /></span>
-                    <span className="tiny muted">{d.matches} jogo(s) · {d.wins}V {d.losses}D · {d.points} pts</span>
+                    <span className="tiny muted">
+                      {plural(d.matches, 'jogo')} · {d.wins}V {d.losses}D · {d.points} pts
+                    </span>
+                    <ForcaDaDupla f={forcas.get(d.key)} />
                   </span>
                   <span className="duo-pct">{Math.round(pct * 100)}%</span>
                 </button>
@@ -388,6 +404,7 @@ function DetalheDupla({
   onClose: () => void
 }) {
   const { data, nameOf, playerById } = useStore()
+  const forca = useMemo(() => forcaDeDuplas(data).get(duo.key), [data, duo.key])
   const jogos = useMemo(() => duoMatches(matches, duo.a, duo.b), [matches, duo])
   const dataDaSessao = new Map(data.sessions.map((s) => [s.id, s.date]))
   const pct = duo.matches === 0 ? 0 : duo.wins / duo.matches
@@ -422,6 +439,34 @@ function DetalheDupla({
         <StatBox k="Games" v={`${duo.gamesWon}/${duo.gamesLost}`} />
         <StatBox k="Plays" v={duo.sessions.size} />
       </div>
+
+      {forca && (
+        <div className="card" style={{ marginTop: 12, marginBottom: 0 }}>
+          <div className="row" style={{ gap: 10 }}>
+            <span style={{ fontSize: 24 }}>{nivelDeForca(forca.nota).emoji}</span>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 800, color: nivelDeForca(forca.nota).cor }}>
+                Força da dupla: {forca.nota}
+              </div>
+              <div className="tiny muted">
+                {forca.entrosamento === 0
+                  ? 'exatamente o que a força dos dois previa'
+                  : forca.entrosamento > 0
+                    ? `+${forca.entrosamento} além do que a força dos dois previa`
+                    : `${forca.entrosamento} abaixo do que a força dos dois previa`}
+                {forca.provisoria && ' · provisória'}
+              </div>
+            </div>
+          </div>
+          <p className="tiny muted" style={{ marginTop: 8, marginBottom: 0 }}>
+            A média dos dois dá <strong>{forca.base}</strong> — é o que a dupla deveria valer.
+            O número acima é o que ela vale <strong>pelo que renderam juntos</strong>: cada partida
+            deles move essa nota conforme o resultado e a força de quem estava do outro lado.
+            {forca.provisoria &&
+              ` Com menos de ${JOGOS_PARA_ENTROSAMENTO} jogos juntos, ainda é cedo para tirar conclusão.`}
+          </p>
+        </div>
+      )}
 
       <div className="section-title" style={{ marginTop: 16 }}>⚔️ Contra quem jogaram</div>
       <div className="scroll-x">
@@ -664,5 +709,24 @@ function LinhaDaForca({
         {dif === 0 ? 'exatamente na média' : dif > 0 ? `+${dif} sobre a média` : `${dif} da média`}
       </div>
     </div>
+  )
+}
+
+
+/** A forca da dupla na linha da lista: nivel, nota e o entrosamento. */
+function ForcaDaDupla({ f }: { f?: ForcaDeDupla }) {
+  if (!f) return null
+  const n = nivelDeForca(f.nota)
+  return (
+    <span className="tiny nowrap" style={{ display: 'block', marginTop: 2 }}>
+      <span style={{ color: n.cor, fontWeight: 800 }}>{n.emoji} força {f.nota}</span>
+      {f.entrosamento !== 0 && (
+        <span className="muted">
+          {' '}
+          ({f.entrosamento > 0 ? '+' : ''}
+          {f.entrosamento} juntos{f.provisoria ? '?' : ''})
+        </span>
+      )}
+    </span>
   )
 }
