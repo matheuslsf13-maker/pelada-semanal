@@ -233,28 +233,43 @@ export function computeStreaks(data: AppData): Streaks {
     const rank = rankPlayers(computeStats(ms), nameOf)
     if (rank.length === 0) continue
 
-    // campeoes do dia (para os titulos e a arte do mes)
-    const top = rank[0]
-    const champions = rank.filter(
-      (x) => x.points === top.points && balance(x) === balance(top) && x.wins === top.wins,
-    )
-    winnersOf.set(s.id, champions.map((c) => c.player_id))
+    // no grupos+duplas quem decide o dia e a DUPLA, e a chave ja disse tudo
+    const duplas = soFase2 ? rankDuplasDoDia(ms, nameOf) : []
+
+    /*
+     * CAMPEOES DO DIA (para os titulos e a arte do mes).
+     *
+     * No grupos+duplas o titulo foi decidido na quadra, na final -- nao no
+     * somatorio de pontos. Com bye a vice chega a somar MAIS pontos que a
+     * campea, porque jogou uma partida a mais, e o "dia vencido" iria para
+     * quem perdeu a final. Nos outros formatos nao ha final: o dia e do
+     * somatorio mesmo, e o empate exato divide o titulo.
+     */
+    if (soFase2) {
+      const ouro = duplas.find((d) => d.medalha === 3)
+      winnersOf.set(s.id, ouro ? [ouro.a, ouro.b] : [])
+    } else {
+      const top = rank[0]
+      winnersOf.set(
+        s.id,
+        rank
+          .filter(
+            (x) => x.points === top.points && balance(x) === balance(top) && x.wins === top.wins,
+          )
+          .map((c) => c.player_id),
+      )
+    }
 
     /*
      * Podio do dia.
      *
-     * No grupos+duplas quem decide o dia e a DUPLA, e os grupos ja se
-     * misturaram no mata-mata -- entao nao ha podio por grupo: sobem as tres
-     * duplas medalhistas, com os dois de cada uma. Sao 6 de 16 num play
-     * tipico (37%), menos generoso que o modo em grupos, onde 4 grupos de 4
-     * ja levam 8 ao podio.
+     * No grupos+duplas os grupos ja se misturaram no mata-mata -- entao nao
+     * ha podio por grupo: sobem as tres duplas medalhistas, com os dois de
+     * cada uma. Sao 6 de 16 num play tipico (37%), menos generoso que o modo
+     * em grupos, onde 4 grupos de 4 ja levam 8 ao podio.
      */
     const noPodio = soFase2
-      ? new Set(
-          rankDuplasDoDia(ms, nameOf)
-            .slice(0, DUPLAS_NO_PODIO)
-            .flatMap((d) => [d.a, d.b]),
-        )
+      ? new Set(duplas.slice(0, DUPLAS_NO_PODIO).flatMap((d) => [d.a, d.b]))
       : new Set(podiosDoDia(rank, s.groups).flatMap((p) => p.rows.map((x) => x.player_id)))
     podiumOf.set(s.id, [...noPodio])
 

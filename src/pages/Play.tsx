@@ -1148,6 +1148,41 @@ function PlayDetail({
     daUltimaRodada.every(isPlayed) &&
     vivas.length > 1
   const rotuloDaProxima = vivas.length > 1 ? nomeDaRodada(vivas.length) : ''
+  /**
+   * QUEM JÁ PASSOU, ENQUANTO A RODADA AINDA CORRE
+   *
+   * Com bye ou com a partida já lançada, a dupla está classificada e
+   * ninguém precisa esperar o resto da rodada para saber -- nem ela, que quer
+   * saber se dá tempo de ir tomar água, nem quem ainda joga, que quer saber
+   * quem está esperando do outro lado.
+   *
+   * Some quando a rodada fecha (aí o cartão de montar a próxima assume) e na
+   * final, que não tem próxima.
+   */
+  const jaClassificadas = useMemo(() => {
+    if (!soFase2 || !session.duos?.length || !daUltimaRodada.length) return null
+    const chave = (d: readonly string[]) => [...d].sort().join('|')
+    const jogando = new Set<string>()
+    for (const m of daUltimaRodada) {
+      if (isPlayed(m)) continue
+      jogando.add(chave(m.team_a))
+      jogando.add(chave(m.team_b))
+    }
+    // rodada inteira lançada: quem avisa aí é o cartão da próxima fase
+    if (!jogando.size) return null
+    const passaram = vivas.filter((d) => !jogando.has(chave(d)))
+    if (!passaram.length) return null
+    // quantas entraram nesta rodada = as vivas mais as já eliminadas nela
+    const entraram = vivas.length + daUltimaRodada.filter(isPlayed).length
+    const restarao = entraram - daUltimaRodada.length
+    if (restarao <= 1) return null
+    const nome = nomeDaRodada(restarao).toLowerCase()
+    return {
+      duplas: passaram,
+      onde: /^(quartas|oitavas)/.test(nome) ? `nas ${nome}` : `na ${nome}`,
+    }
+  }, [soFase2, session.duos, daUltimaRodada, vivas])
+
   /** Ha um proximo passo obrigatorio antes de encerrar o play? */
   const faltaFase = podeGerarFase2 || podeGerarRodada
 
@@ -1746,6 +1781,15 @@ function PlayDetail({
 
       <div className="card">
         <div className="section-title">🏐 Quadras agora</div>
+        {jaClassificadas && (
+          <div className="banner ok classificados">
+            🎟️ <strong>
+              {jaClassificadas.duplas.length === 1 ? 'Já está' : 'Já estão'} {jaClassificadas.onde}
+            </strong>{' '}
+            {'—'}{' '}
+            {jaClassificadas.duplas.map((d) => `${nameOf(d[0])} + ${nameOf(d[1])}`).join(', ')}.
+          </div>
+        )}
         {jaPodemIr.length > 0 && (
           <div className="banner ok livres">
             🚪 <strong>
@@ -2923,11 +2967,13 @@ function DuplasDoDia({ partidas }: { partidas: Match[] }) {
                 {nameOf(d.a)} + {nameOf(d.b)}
               </strong>
               <span className="tiny muted">
-                {i === 0 && d.losses === 0
+                {d.medalha === 3
                   ? 'dupla campeã do dia'
-                  : d.bronze
-                    ? 'venceu a disputa de 3º'
-                    : `caiu ${d.ateFase === 4 ? 'na final' : d.ateFase === 3 ? 'na semifinal' : 'nas quartas'}`}{' '}
+                  : d.medalha === 2
+                    ? 'vice-campeã do dia'
+                    : d.medalha === 1
+                      ? 'venceu a disputa de 3º'
+                      : `caiu ${d.saiuEm}`}{' '}
                 · {d.wins}V {d.losses}D
               </span>
             </span>

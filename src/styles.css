@@ -1222,3 +1222,11 @@ textarea.input { line-height: 1.45; }
   border: 1px solid var(--verde);
   margin-bottom: 10px;
 }
+
+/* quem ja passou de fase e espera o resto da rodada */
+.banner.classificados {
+  background: var(--marca-suave);
+  color: var(--marca);
+  border: 1px solid var(--marca);
+  margin-bottom: 10px;
+}

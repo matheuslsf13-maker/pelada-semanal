@@ -327,6 +327,34 @@ export type DuplaDoDia = DuoStat & {
   saldo: number
   /** Venceu a disputa de 3o lugar -- o bronze saiu da quadra, nao do desempate. */
   bronze: boolean
+  /** 3 ouro, 2 prata, 1 bronze, 0 fora do podio. Sai da chave, nao do saldo. */
+  medalha: 0 | 1 | 2 | 3
+  /** Onde a campanha acabou, com preposicao: "na semifinal", "nas quartas". */
+  saiuEm: string
+}
+
+/** A menor potencia de 2 que comporta `n`. */
+function chaveDe(n: number): number {
+  let t = 1
+  while (t < n) t *= 2
+  return t
+}
+
+/**
+ * O nome da rodada em que a dupla caiu, pelo tanto de duplas que ENTRARAM
+ * nela.
+ *
+ * Contar jogos erraria duas vezes: uma rodada de 5 duplas tem 3 byes e um
+ * jogo so -- nao e "a final" -- e o numero da fase tambem nao serve, porque
+ * com 4 duplas a fase 3 ja e a final e com 5 ela e a semi.
+ */
+function rodadaDeSaida(entraram: number): string {
+  const sobram = chaveDe(entraram) / 2
+  if (sobram <= 1) return 'na final'
+  if (sobram === 2) return 'na semifinal'
+  if (sobram === 4) return 'nas quartas de final'
+  if (sobram === 8) return 'nas oitavas de final'
+  return `na rodada de ${entraram} duplas`
 }
 
 export function rankDuplasDoDia(matches: Match[], nameOf: (id: string) => string): DuplaDoDia[] {
@@ -352,22 +380,57 @@ export function rankDuplasDoDia(matches: Match[], nameOf: (id: string) => string
     bronze.add(pairKey(venceu[0], venceu[1]))
   }
 
-  return [...stats.values()]
-    .map((d) => ({
-      ...d,
-      ateFase: ateFase.get(d.key) ?? 0,
-      saldo: d.gamesWon - d.gamesLost,
-      bronze: bronze.has(d.key),
-    }))
-    .sort(
-      (x, y) =>
-        y.ateFase - x.ateFase ||
-        Number(y.bronze) - Number(x.bronze) ||
-        y.wins - x.wins ||
-        y.points - x.points ||
-        y.saldo - x.saldo ||
-        nameOf(x.a).localeCompare(nameOf(y.a), 'pt-BR'),
-    )
+  /*
+   * OURO E PRATA SAEM DA FINAL, NAO DA CONTA DE VITORIAS
+   *
+   * Com bye a conta engana: a vice que subiu da preliminar chega a final com
+   * as MESMAS vitorias da campea que passou direto, e com mais pontos, porque
+   * jogou uma partida a mais. O desempate por pontos entao virava o podio de
+   * cabeca para baixo -- a campea aparecia em 2o e as duas saiam rotuladas
+   * como "caiu na final". A chave ja sabe quem ganhou; e so perguntar a ela.
+   */
+  const ultimaFase = matches.reduce((t, m) => (m.disputa_3o ? t : Math.max(t, m.fase ?? 2)), 0)
+  const finais = matches.filter(
+    (m) => !m.disputa_3o && (m.fase ?? 2) === ultimaFase && isPlayed(m),
+  )
+  let ouro = ''
+  let prata = ''
+  // so ha campea quando a ultima rodada e um jogo so e ele ja foi lancado:
+  // play parado no meio da semifinal ainda nao tem podio
+  if (finais.length === 1) {
+    const f = finais[0]
+    const ganhouA = (f.score_a as number) > (f.score_b as number)
+    const venceu = ganhouA ? f.team_a : f.team_b
+    const perdeu = ganhouA ? f.team_b : f.team_a
+    ouro = pairKey(venceu[0], venceu[1])
+    prata = pairKey(perdeu[0], perdeu[1])
+  }
+
+  const linhas = [...stats.values()].map((d) => ({
+    ...d,
+    ateFase: ateFase.get(d.key) ?? 0,
+    saldo: d.gamesWon - d.gamesLost,
+    bronze: bronze.has(d.key),
+    medalha: (d.key === ouro ? 3 : d.key === prata ? 2 : bronze.has(d.key) ? 1 : 0) as 0 | 1 | 2 | 3,
+    saiuEm: '',
+  }))
+
+  // quantas duplas entraram na rodada em que cada uma caiu: as que chegaram
+  // ate aquela fase, contando as que passaram dela
+  for (const d of linhas) {
+    d.saiuEm = rodadaDeSaida(linhas.filter((x) => x.ateFase >= d.ateFase).length)
+  }
+
+  return linhas.sort(
+    (x, y) =>
+      y.medalha - x.medalha ||
+      y.ateFase - x.ateFase ||
+      Number(y.bronze) - Number(x.bronze) ||
+      y.wins - x.wins ||
+      y.points - x.points ||
+      y.saldo - x.saldo ||
+      nameOf(x.a).localeCompare(nameOf(y.a), 'pt-BR'),
+  )
 }
 
 /** Quantas duplas sobem ao podio do mata-mata: ouro, prata e bronze. */
