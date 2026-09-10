@@ -266,7 +266,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .input:focus, .select:focus { border-color: var(--marca); background: var(--card-2); }
 label.field { display: block; }
-label.field > span {
+/* vale para `label.field` e `div.field`: antes so o label pegava estilo, e os
+   campos embrulhados em div saiam com o texto corrido do corpo -- dois visuais
+   no mesmo formulario */
+.field > span {
   display: block;
   font-size: 11.5px;
   font-weight: 700;
@@ -274,6 +277,35 @@ label.field > span {
   letter-spacing: .5px;
   color: var(--muted);
   margin-bottom: 5px;
+}
+
+/* a data pedia a linha inteira para mostrar 10 caracteres */
+.input[type="date"] {
+  font-variant-numeric: tabular-nums;
+  min-height: 44px; /* alvo de toque no celular */
+}
+
+/* a lista de quem vai jogar: colunas iguais, para as bordas alinharem */
+.grade-atletas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.grade-atletas .chip {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.grade-atletas .chip > span:not([style]) { min-width: 0; }
+.chip .nome-atleta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
 }
 
 .chip {
@@ -1047,4 +1079,12 @@ textarea.input { line-height: 1.45; }
   bottom: 0;
   border-radius: 999px;
   opacity: .85;
+}
+
+/* cada fase do grupos+duplas: games e desempate no mesmo bloco */
+.fase-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--card-2);
 }

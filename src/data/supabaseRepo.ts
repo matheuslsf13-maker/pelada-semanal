@@ -67,6 +67,7 @@ export const supabaseRepo: Repo = {
         ranked: _r,
         desempate: _d,
         desempate_vai2: _d2,
+        desempates: _ds,
         ...resto
       } = s
       const retry = await client().from('sessions').upsert(resto)

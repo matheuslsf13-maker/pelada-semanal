@@ -49,15 +49,24 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
 
 - Partida até 4 games. Pontos = games do vencedor − do perdedor (mínimo 1).
   Quem perde não pontua.
-- **O empate no fim é configurável** (`sessions.desempate`, `src/lib/desempate.ts`):
-  `nenhum` (quem chega ao alvo primeiro leva — o que o app sempre fez),
-  `vantagem` (“vai a 2”: o 3x3 não fecha, segue até abrir dois games),
-  `tie7` e `tie10` (o 3x3 sai num tie de 7 ou 10 pontos corridos).
-  `desempate_vai2` diz que o **tie** também só fecha com 2 de diferença.
-  **Só o `vantagem` muda o que dá para lançar**: os botões do placar passam a
-  mostrar 5x3, 6x4, 7x5 e o vencedor deixa de ser sempre o alvo. Nos ties o
-  placar em games continua 4x3 — o tie decide o game que fecha —, então ali a
-  configuração só muda a regra anunciada na tela.
+- **O empate no fim é configurável** (`sessions.desempate`, `src/lib/desempate.ts`).
+  São **duas perguntas encadeadas**, e a `Regra` guarda as duas num campo só
+  (`nenhum`, `vantagem`, `tie7`, `vantagem-tie10v2`…) para caber também num
+  seletor por fase:
+  - **No `alvo-1`x`alvo-1`** (o 3x3): quem chegar ao alvo leva · vai a 2 · tie de
+    7 · super tie de 10.
+  - **No `alvo`x`alvo`**, e só quando a primeira foi *vai a 2*: segue até abrir
+    dois (sem teto) · tie de 7 · super tie. É o modelo do organizador: numa
+    partida de 6, o 5x5 vai a 2 e fecha em 7x5, e o 6x6 vai para o tie e fecha
+    em 7x6.
+  - `tieVai2` diz que o **tie** também só fecha com 2 pontos de diferença.
+  **Só a `vantagem` muda o que dá para lançar**, porque é a única em que o
+  vencedor passa do alvo; os botões do placar passam a mostrar o placar inteiro
+  (5x3, 7x5, 7x6). Com tie o placar em games não muda — o tie decide o game que
+  fecha —, então ali a configuração só muda a regra anunciada na tela.
+  **No `grupos-duplas` a regra é por fase** (`sessions.desempates`, mesma conta
+  do `alvos`): o seletor fica embaixo dos games de cada fase, então os grupos
+  podem fechar no 4 seco e a final ir a 2.
 - **Cada grupo tem uma cor** (`--g1`…`--g8`, `classeDoGrupo`), na etiqueta, na
   caixa do grupo, na linha da fila e na borda do cartão da partida. São cores
   escolhidas para se distinguirem **entre si** na beira da quadra, e por isso
@@ -99,7 +108,7 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
     **confronto direto** → nome. Nunca há empate real: a colocação sai por
     posição na lista ordenada.
   - `matches.fase` (1 a 4) separa as fases; `sessions.duos` guarda as duplas.
-  - **Não existe “Vai até” neste formato**: cada fase tem os seus games
+  - **Não existe “Vai até” nem desempate único neste formato**: cada fase tem os seus games
     (`sessions.alvos`), então o campo some da tela de criar. O padrão de
     jogadores por grupo também muda para **4** ao escolher o formato, que é
     como o grupo joga.

@@ -79,6 +79,13 @@ export type PlaySession = {
   /** So para tie7/tie10: o proprio tie tambem precisa de 2 pontos de diferenca. */
   desempate_vai2?: boolean | null
   /**
+   * No formato `grupos-duplas`, o desempate de CADA fase:
+   * [grupos, duplas fixas, semifinal, final]. Ausente = `desempate` em todas.
+   * Aqui o "o tie vai a 2" entra no proprio valor (`tie7v2`, `tie10v2`),
+   * para cada fase caber num seletor so. Ver `src/lib/desempate.ts`.
+   */
+  desempates?: string[] | null
+  /**
    * O play vale para o campeonato? `false` = play avulso: as partidas contam
    * no historico e no equilibrio das duplas, mas nao somam pontos no ranking
    * do mes nem mexem nas sequencias. Ausente conta como `true` (plays antigos).

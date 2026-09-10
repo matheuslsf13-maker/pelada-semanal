@@ -31,3 +31,16 @@ comment on column public.sessions.desempate is
   'o que fazer no empate em target-1: nenhum, vantagem (vai a 2), tie7 ou tie10';
 comment on column public.sessions.desempate_vai2 is
   'tie7/tie10: o proprio tie tambem so fecha com 2 pontos de diferenca';
+
+-- ------------------------------------------------------------
+--  Um desempate por FASE, no formato grupos + duplas.
+--  Mesma logica do `alvos`: [grupos, duplas fixas, semifinal, final].
+--  Nulo = usa `desempate` em todas as fases, como nos outros formatos.
+--  Aqui o "o tie tambem vai a 2" entra no proprio valor (tie7v2, tie10v2),
+--  para cada fase caber num seletor so na tela.
+-- ------------------------------------------------------------
+alter table public.sessions
+  add column if not exists desempates jsonb;
+
+comment on column public.sessions.desempates is
+  'grupos-duplas: desempate de cada fase [grupos, duplas, semi, final]; nulo = usa desempate';

@@ -37,12 +37,20 @@ import {
   type PlayerStat,
 } from '../lib/stats'
 import {
-  DESEMPATES,
-  desempateDe,
-  explicarDesempate,
+  OPCOES_DE_FASE,
+  OPCOES_NO_EMPATE,
+  OPCOES_NO_TETO,
+  REGRA_PADRAO,
+  escreverRegra,
+  explicarRegra,
   gamesDoPerdedor,
   gamesDoVencedor,
-  type Desempate,
+  lerRegra,
+  resumoDaFase,
+  temTie,
+  type NoEmpate,
+  type NoTeto,
+  type Regra,
 } from '../lib/desempate'
 import { computeStreaks, podiosDoDia, streakLevel, vagasDoPodio } from '../lib/streaks'
 import {
@@ -278,8 +286,13 @@ function NewPlay({
   /** Pontos que fecham a partida em cada fase: grupos, duplas, semi, final. */
   const [alvos, setAlvos] = useState<number[]>([4, 4, 4, 4])
   const [porGrupo, setPorGrupo] = useState(8)
-  const [desempate, setDesempate] = useState<Desempate>(desempateDe(preset.desempate))
-  const [desempateVai2, setDesempateVai2] = useState(preset.desempate_vai2 ?? false)
+  const [regra, setRegra] = useState<Regra>(
+    preset.desempate ? lerRegra(preset.desempate) : { ...REGRA_PADRAO },
+  )
+  /** Um desempate por fase, so no grupos+duplas: grupos, duplas, semi, final. */
+  const [desempates, setDesempates] = useState<string[]>(
+    preset.desempates ?? ['nenhum', 'nenhum', 'nenhum', 'nenhum'],
+  )
   const [ranked, setRanked] = useState(preset.ranked ?? true)
   const [importando, setImportando] = useState(false)
   const [target, setTarget] = useState(preset.target ?? 4)
@@ -395,8 +408,8 @@ function NewPlay({
         courts: effCourts,
         rounds: fila.length, // a coluna se chama rounds; hoje e o total de partidas
         target,
-        desempate,
-        desempate_vai2: desempate === 'tie7' || desempate === 'tie10' ? desempateVai2 : false,
+        desempate: escreverRegra(regra),
+        desempate_vai2: regra.tieVai2,
         player_ids: selected,
         status: 'open',
         created_at: new Date().toISOString(),
@@ -407,6 +420,7 @@ function NewPlay({
         duos: null,
         duplas_mm: emGrupos && emDuplas ? duplasMM : null,
         alvos: emGrupos && emDuplas ? alvos : null,
+        desempates: emGrupos && emDuplas ? desempates : null,
         ranked,
       }
       await saveSession(session)
@@ -425,8 +439,10 @@ function NewPlay({
           <div className="section-title" style={{ margin: 0 }}>🎾 Novo Play</div>
           <button className="btn ghost sm" onClick={onCancel}>Cancelar</button>
         </div>
-        <div className="row spread" style={{ marginTop: 12 }}>
-          <div className="section-title" style={{ margin: 0 }}>👥 Quem vai jogar ({selected.length})</div>
+        <div className="row spread" style={{ marginTop: 12, gap: 8 }}>
+          <div className="section-title nowrap" style={{ margin: 0 }}>
+            👥 Quem joga ({selected.length})
+          </div>
           <div className="row" style={{ gap: 6 }}>
             <button className="btn ghost sm" onClick={selecionarTodos}>Todos</button>
             <button className="btn ghost sm" onClick={() => setSelected([])}>Limpar</button>
@@ -479,7 +495,7 @@ function NewPlay({
             Cadastre os jogadores na aba <strong>Jogadores</strong> — ou cole a lista do grupo no botão acima.
           </Empty>
         ) : (
-          <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
+          <div className="grade-atletas">
             {available.map((p) => {
               const on = selected.includes(p.id)
               const sit = situacaoDoAtleta(p, data)
@@ -492,7 +508,7 @@ function NewPlay({
                   onClick={() => toggle(p.id)}
                 >
                   <Avatar player={playerById(p.id)} size={22} />
-                  {p.name}
+                  <span className="nome-atleta">{p.nickname?.trim() || p.name}</span>
                   {!sit.liberado && <span style={{ color: 'var(--danger)' }}>●</span>}
                   {sit.alerta && <span title={sit.alerta}>⚠️</span>}
                 </button>
@@ -524,11 +540,11 @@ function NewPlay({
             <span>Nome do play</span>
             <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
-          <label className="field">
-            <span>Data</span>
-            <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
           <div className="grid2">
+            <label className="field">
+              <span>Data</span>
+              <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
             <div className="field">
               <span>Quadras</span>
               <Stepper value={courts} min={1} max={12} onChange={setCourts} />
@@ -540,56 +556,72 @@ function NewPlay({
                     : 'quadras disponíveis hoje'}
               </em>
             </div>
-            {!emDuplas && (
-              <div className="field">
-                <span>Vai até</span>
-                <Stepper value={target} min={1} max={21} onChange={setTarget} />
-                <em className="hint">games para vencer a partida — o padrão é 4</em>
-              </div>
-            )}
           </div>
 
-          <div className="field">
-            <span>Se empatar no fim</span>
-            <div className="chips-scroll">
-              {DESEMPATES.map((d) => (
-                <button
-                  key={d.valor}
-                  className={`chip ${desempate === d.valor ? 'on' : 'off'}`}
-                  style={{ flex: 'none' }}
-                  onClick={() => setDesempate(d.valor)}
-                >
-                  {d.rotulo}
-                </button>
-              ))}
+          {!emDuplas && (
+            <div className="field">
+              <span>Vai até</span>
+              <Stepper value={target} min={1} max={21} onChange={setTarget} />
+              <em className="hint">games para vencer a partida — o padrão é 4</em>
             </div>
-            <em className="hint">
-              {explicarDesempate(emDuplas ? alvos[0] : target, desempate, desempateVai2)}
-            </em>
-            {(desempate === 'tie7' || desempate === 'tie10') && (
-              <label className="switch" style={{ marginTop: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={desempateVai2}
-                  onChange={(e) => setDesempateVai2(e.target.checked)}
-                />
-                <span>
-                  <strong>O tie também vai a 2</strong>
-                  <span className="tiny muted">
-                    {desempateVai2
-                      ? 'o tie só fecha com dois pontos de diferença — 7x5 sim, 7x6 não'
-                      : 'quem chegar primeiro na pontuação do tie leva, mesmo por um ponto'}
+          )}
+
+          {!emDuplas && (
+            <div className="field">
+              <span>No {target - 1}x{target - 1}</span>
+              <div className="row wrap" style={{ gap: 6 }}>
+                {OPCOES_NO_EMPATE.map((d) => (
+                  <button
+                    key={d.valor}
+                    className={`chip ${regra.no1 === d.valor ? 'on' : 'off'}`}
+                    style={{ flex: 'none' }}
+                    onClick={() => setRegra((r) => ({ ...r, no1: d.valor as NoEmpate }))}
+                  >
+                    {d.rotulo}
+                  </button>
+                ))}
+              </div>
+
+              {/* a segunda pergunta so existe quando o jogo pode chegar la */}
+              {regra.no1 === 'vantagem' && (
+                <>
+                  <span style={{ marginTop: 12 }}>E se chegar a {target}x{target}</span>
+                  <div className="row wrap" style={{ gap: 6 }}>
+                    {OPCOES_NO_TETO.map((d) => (
+                      <button
+                        key={d.valor}
+                        className={`chip ${regra.teto === d.valor ? 'on' : 'off'}`}
+                        style={{ flex: 'none' }}
+                        onClick={() => setRegra((r) => ({ ...r, teto: d.valor as NoTeto }))}
+                      >
+                        {d.rotulo}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <em className="hint" style={{ marginTop: 6 }}>{explicarRegra(target, regra)}</em>
+
+              {temTie(regra) && (
+                <label className="switch" style={{ marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={regra.tieVai2}
+                    onChange={(e) => setRegra((r) => ({ ...r, tieVai2: e.target.checked }))}
+                  />
+                  <span>
+                    <strong>O tie também vai a 2</strong>
+                    <span className="tiny muted">
+                      {regra.tieVai2
+                        ? 'o tie só fecha com dois pontos de diferença — 7x5 sim, 7x6 não'
+                        : 'quem chegar primeiro na pontuação do tie leva, mesmo por um ponto'}
+                    </span>
                   </span>
-                </span>
-              </label>
-            )}
-            {emDuplas && (
-              <em className="hint" style={{ marginTop: 4 }}>
-                Aqui cada fase tem os seus games (lá embaixo), então não existe um
-                “vai até” só — a regra do empate vale em todas elas.
-              </em>
-            )}
-          </div>
+                </label>
+              )}
+            </div>
+          )}
 
           <div className="field">
             <span>Formato</span>
@@ -793,19 +825,37 @@ function NewPlay({
                 <span>Pontos que fecham a partida, por fase</span>
                 <div className="stack" style={{ gap: 8 }}>
                   {['Grupos', 'Duplas fixas', 'Semifinal', 'Final'].map((rotulo, i) => (
-                    <div key={rotulo} className="row spread" style={{ gap: 10 }}>
-                      <span className="tiny grow">{rotulo}</span>
-                      <Stepper
-                        value={alvos[i]}
-                        min={2}
-                        max={12}
-                        onChange={(v) => setAlvos((a) => a.map((x, k) => (k === i ? v : x)))}
-                      />
+                    <div key={rotulo} className="fase-box">
+                      <div className="row spread" style={{ gap: 10 }}>
+                        <strong className="tiny grow">{rotulo}</strong>
+                        <Stepper
+                          value={alvos[i]}
+                          min={2}
+                          max={12}
+                          onChange={(v) => setAlvos((a) => a.map((x, k) => (k === i ? v : x)))}
+                        />
+                      </div>
+                      <select
+                        className="select"
+                        style={{ marginTop: 6 }}
+                        value={desempates[i] ?? 'nenhum'}
+                        onChange={(e) =>
+                          setDesempates((d) => d.map((x, k) => (k === i ? e.target.value : x)))
+                        }
+                      >
+                        {OPCOES_DE_FASE.map((op) => (
+                          <option key={op.valor} value={op.valor}>{op.rotulo}</option>
+                        ))}
+                      </select>
+                      <em className="hint" style={{ marginTop: 4 }}>
+                        {resumoDaFase(alvos[i], desempates[i] ?? 'nenhum')}
+                      </em>
                     </div>
                   ))}
                 </div>
                 <em className="hint">
-                  Dá para deixar a final mais longa que os grupos — é o jogo que decide o dia.
+                  Cada fase fecha do seu jeito: os grupos podem ir no 4 seco e a final ir a 2 —
+                  é o jogo que decide o dia.
                 </em>
               </div>
 
@@ -1017,8 +1067,23 @@ function PlayDetail({
     [matches],
   )
 
-  /** O modo de desempate deste play. Plays antigos nao tem: e `nenhum`. */
-  const desempate = desempateDe(session.desempate)
+  /**
+   * A regra do empate desta partida.
+   *
+   * No grupos+duplas cada fase tem a sua (`session.desempates`), pela mesma
+   * conta do `alvoDe`. Nos outros formatos, e nos plays antigos, vale o
+   * `desempate` unico do play.
+   */
+  const regraDe = (m: Match): Regra => {
+    const lista = session.desempates
+    if (!lista?.length) return lerRegra(session.desempate)
+    const fase = m.fase ?? 1
+    if (fase === 1) return lerRegra(lista[0])
+    const jogosNaFase = matches.filter((x) => (x.fase ?? 1) === fase).length
+    if (jogosNaFase === 1) return lerRegra(lista[3])
+    if (jogosNaFase === 2) return lerRegra(lista[2])
+    return lerRegra(lista[1])
+  }
 
   const alvoDe = (m: Match) => {
     const alvos = session.alvos
@@ -1504,7 +1569,13 @@ function PlayDetail({
             {soFase2 ? ' · games por fase' : ` · até ${session.target} games`}
           </div>
           <div className="tiny muted" style={{ marginTop: 2 }}>
-            {explicarDesempate(session.target, desempate, session.desempate_vai2 ?? false)}
+            {session.desempates?.length ? (
+              ['Grupos', 'Duplas', 'Semi', 'Final']
+                .map((r, i) => `${r}: ${resumoDaFase(session.alvos?.[i] ?? session.target, session.desempates?.[i] ?? 'nenhum')}`)
+                .join(' · ')
+            ) : (
+              explicarRegra(session.target, lerRegra(session.desempate))
+            )}
           </div>
         </div>
         <div className="grid3" style={{ marginTop: 12 }}>
@@ -1610,7 +1681,7 @@ function PlayDetail({
                 match={m}
                 quadra={q}
                 target={alvoDe(m)}
-                desempate={desempate}
+                desempate={regraDe(m)}
                 editable={editable}
                 iniciada={!!atual}
                 inicio={inicioDe(m)}
@@ -1708,7 +1779,7 @@ function PlayDetail({
         <CorrigirPlacar
           match={corrigindo}
           target={alvoDe(corrigindo)}
-          desempate={desempate}
+          desempate={regraDe(corrigindo)}
           onClose={() => setCorrigindo(null)}
           onScore={(a, b) => { setScore(corrigindo, a, b); setCorrigindo(null) }}
         />
@@ -1981,7 +2052,7 @@ function MatchCard({
   match: Match
   quadra: number
   target: number
-  desempate: Desempate
+  desempate: Regra
   editable: boolean
   iniciada: boolean
   inicio: string | null
@@ -2059,7 +2130,7 @@ function MatchCard({
         </div>
         <div className="team win">
           <Duo ids={winner === 'a' ? match.team_a : match.team_b} />
-          <span className="score-box">{desempate === 'vantagem' ? `${target}+` : target}</span>
+          <span className="score-box">{desempate.no1 === 'vantagem' ? `${target}+` : target}</span>
         </div>
         <div className="ask">Quantos games <strong>{nameOf(loserIds[0])} + {nameOf(loserIds[1])}</strong> fez?</div>
         <div className="games-row">
@@ -2273,7 +2344,7 @@ function CorrigirPlacar({
 }: {
   match: Match
   target: number
-  desempate: Desempate
+  desempate: Regra
   onScore: (a: number | null, b: number | null) => void
   onClose: () => void
 }) {
