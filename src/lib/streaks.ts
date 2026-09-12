@@ -234,7 +234,7 @@ export function computeStreaks(data: AppData): Streaks {
     if (rank.length === 0) continue
 
     // no grupos+duplas quem decide o dia e a DUPLA, e a chave ja disse tudo
-    const duplas = soFase2 ? rankDuplasDoDia(ms, nameOf) : []
+    const duplas = soFase2 ? rankDuplasDoDia(ms, nameOf, undefined, s.duos ?? undefined) : []
 
     /*
      * CAMPEOES DO DIA (para os titulos e a arte do mes).

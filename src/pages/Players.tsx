@@ -1,5 +1,5 @@
 import { AvisoDoBanco } from '../components/AvisoDoBanco'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import ImportarLista from '../components/ImportarLista'
 import { Avatar, Empty, Modal } from '../components/ui'
 import { nivelDeForca, notaDeForca, rankingDeForca } from '../lib/forca'
@@ -72,6 +72,9 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
     }
     await savePlayer(p)
     setName('')
+    // a categoria fica para a proxima de proposito (costuma ser a mesma para
+    // uma leva); a forca e de cada pessoa, e nao pode vazar
+    setNovaForca(ELO_INICIAL)
     onToast(`${n} entrou no grupo 🎾`)
   }
 
@@ -593,6 +596,21 @@ function ForcaInicial({
 }) {
   const nivel = nivelDeForca(valor)
   const PASSO = 25
+  const MIN = 1200
+  const MAX = 1800
+  // o que esta sendo digitado e um rascunho: limitar a cada tecla tornava
+  // impossivel digitar "1600" (o "1" virava 1200 antes do resto chegar)
+  const [texto, setTexto] = useState(String(valor))
+  useEffect(() => setTexto(String(valor)), [valor])
+  const confirmarTexto = () => {
+    const n = Math.round(Number(texto))
+    if (texto.trim() === '' || !Number.isFinite(n)) {
+      setTexto(String(valor))
+      return
+    }
+    onChange(Math.min(MAX, Math.max(MIN, n)))
+    setTexto(String(Math.min(MAX, Math.max(MIN, n))))
+  }
   return (
     <div className="field" style={{ marginTop: 12 }}>
       <span>Força inicial</span>
@@ -600,8 +618,8 @@ function ForcaInicial({
         <button
           type="button"
           className="btn ghost sm"
-          onClick={() => onChange(Math.max(1200, valor - PASSO))}
-          disabled={valor <= 1200}
+          onClick={() => onChange(Math.max(MIN, valor - PASSO))}
+          disabled={valor <= MIN}
         >
           −
         </button>
@@ -609,21 +627,22 @@ function ForcaInicial({
           className="input"
           type="number"
           inputMode="numeric"
-          min={1200}
-          max={1800}
+          min={MIN}
+          max={MAX}
           step={PASSO}
-          value={valor}
+          value={texto}
           style={{ textAlign: 'center', fontWeight: 800 }}
-          onChange={(e) => {
-            const n = Number(e.target.value)
-            if (Number.isFinite(n)) onChange(Math.min(1800, Math.max(1200, Math.round(n))))
+          onChange={(e) => setTexto(e.target.value)}
+          onBlur={confirmarTexto}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
         />
         <button
           type="button"
           className="btn ghost sm"
-          onClick={() => onChange(Math.min(1800, valor + PASSO))}
-          disabled={valor >= 1800}
+          onClick={() => onChange(Math.min(MAX, valor + PASSO))}
+          disabled={valor >= MAX}
         >
           +
         </button>

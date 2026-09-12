@@ -5,10 +5,9 @@ import { POINTS_TABLE } from '../lib/scoring'
 import {
   balance,
   aplicarBye,
-  computeStats,
+  computeStatsComPontos,
   playedMatches,
   pontosDeBye,
-  pontuaveis,
   rankPlayers,
   winRate,
   type PlayerStat,
@@ -89,15 +88,16 @@ export default function Ranking({
 
   const rows = useMemo(() => {
     // no mes entram so os plays do campeonato; no historico entra tudo
-    const todas = playedMatches(data, historico ? {} : { month: activeMonth, ranked: true })
-    // a fase de grupos do grupos+duplas nao pontua: sem isto o total do mes
-    // nao batia com a soma dos dias
-    const ms = pontuaveis(data.sessions, todas)
+    const ms = playedMatches(data, historico ? {} : { month: activeMonth, ranked: true })
     const awards = historico ? streaks.awards : streaks.awards.filter((a) => a.month === activeMonth)
+    // partidas, V/D e saldo contam tudo; os PONTOS so das partidas que
+    // pontuam (a fase de grupos do grupos+duplas nao pontua -- sem isto o
+    // total do mes nao batia com a soma dos dias)
+    const stats = computeStatsComPontos(data.sessions, ms)
     // o bye do mata-mata paga pontos: quem passa direto joga uma partida a
     // menos e nao pode terminar o mes atras de quem precisou jogar
     const bye = pontosDeBye(data.sessions, ms).porJogadora
-    return rankPlayers(aplicarBye(applyBonuses(computeStats(ms), awards), bye), nameOf)
+    return rankPlayers(aplicarBye(applyBonuses(stats, awards), bye), nameOf)
   }, [data, activeMonth, historico, nameOf, streaks])
 
   const fire = comStatus

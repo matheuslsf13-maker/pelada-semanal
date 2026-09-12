@@ -97,8 +97,37 @@ export function tamanhosDosGrupos(jogadores: number, grupos: number): number[] {
  * Embaralhar ANTES de ordenar e o truque: o sort e estavel, entao quem tem nota
  * diferente vai para o lugar certo e so as empatadas ficam na ordem sorteada.
  */
-function filaPorForca(playerIds: string[], ratings: Map<string, number>): string[] {
-  return shuffle(playerIds).sort((a, b) => (ratings.get(b) ?? 2) - (ratings.get(a) ?? 2))
+function filaPorForca(
+  playerIds: string[],
+  ratings: Map<string, number>,
+  semente?: number,
+): string[] {
+  // com semente o sorteio e reproduzivel: a tela recalcula os grupos a cada
+  // mudanca de dado (um pagamento confirmado noutro celular ja basta) e sem
+  // isso as empatadas trocariam de grupo sozinhas na frente da organizadora
+  const base = semente === undefined ? shuffle(playerIds) : embaralharComSemente(playerIds, semente)
+  return base.sort((a, b) => (ratings.get(b) ?? 2) - (ratings.get(a) ?? 2))
+}
+
+/**
+ * Fisher-Yates com semente (mulberry32). Ordena os ids antes, para o
+ * resultado nao depender da ordem em que a presenca foi marcada.
+ */
+function embaralharComSemente<T extends string>(ids: T[], semente: number): T[] {
+  let s = semente >>> 0
+  const rnd = () => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = s
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const a = [...ids].sort()
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
 }
 
 /**
@@ -116,10 +145,12 @@ export function gruposEquilibrados(
   playerIds: string[],
   ratings: Map<string, number>,
   tamanho: number,
+  /** Semente do sorteio entre empatadas; sem ela, sorteia de verdade. */
+  semente?: number,
 ): string[][] {
   const grupos = numeroDeGrupos(playerIds.length, tamanho)
   if (grupos <= 1) return [playerIds.slice()]
-  const ordenados = filaPorForca(playerIds, ratings)
+  const ordenados = filaPorForca(playerIds, ratings, semente)
   const out: string[][] = Array.from({ length: grupos }, () => [])
   ordenados.forEach((id, i) => {
     const volta = Math.floor(i / grupos)
@@ -230,6 +261,56 @@ export function nomeDaRodada(entram: number): string {
   return `Rodada de ${entram} duplas`
 }
 
+/**
+ * Quantas duplas ENTRARAM na rodada `fase`: as que nao tinham perdido antes.
+ *
+ * E isto que diz que rodada e -- nao o numero de jogos dela. Com 5 duplas a
+ * primeira rodada tem 3 byes e UM jogo, e contar jogos a chamaria de final,
+ * com o alvo e o desempate da final. Partidas sem placar e a disputa de 3o
+ * nao eliminam ninguem.
+ */
+export function duplasQueEntraram(
+  duos: readonly (readonly string[])[],
+  matches: Match[],
+  fase: number,
+): number {
+  if (!duos.length) return 0
+  const chave = (d: readonly string[]) => [...d].sort().join('|')
+  const perderam = new Set<string>()
+  for (const m of matches) {
+    const f = m.fase ?? 1
+    if (f < 2 || f >= fase || m.disputa_3o || m.score_a === null || m.score_b === null) continue
+    if (m.score_a === m.score_b) continue
+    perderam.add(chave(m.score_a > m.score_b ? m.team_b : m.team_a))
+  }
+  return duos.filter((d) => !perderam.has(chave(d))).length
+}
+
+/**
+ * Os ajustes na mao por cima dos grupos sorteados.
+ *
+ * Um ajuste de cada vez, na ordem em que foram feitos. O que nao vale mais e
+ * pulado: quem saiu da presenca, grupo que nao existe (o tamanho mudou) e o
+ * ajuste que deixaria um grupo com menos de 4 -- um rodizio precisa de quatro,
+ * e a presenca pode ter mudado desde que o ajuste foi feito.
+ */
+export function aplicarAjustesDeGrupo(
+  base: string[][],
+  movidas: Record<string, number>,
+): string[][] {
+  if (base.length <= 1) return base
+  const out = base.map((g) => g.slice())
+  for (const [id, para] of Object.entries(movidas)) {
+    if (para >= out.length) continue
+    const de = out.findIndex((g) => g.includes(id))
+    if (de < 0 || de === para) continue
+    if (out[de].length <= 4) continue
+    out[de] = out[de].filter((x) => x !== id)
+    out[para] = [...out[para], id]
+  }
+  return out
+}
+
 /** As duplas que ainda estao vivas: as que nunca perderam, na ordem de forca. */
 export function duplasVivas(duos: Duo[], jogos: Match[]): Duo[] {
   const chave = (d: readonly string[]) => [...d].sort().join('|')
@@ -245,10 +326,12 @@ export function formarGrupos(
   playerIds: string[],
   ratings: Map<string, number>,
   tamanho: number,
+  /** Semente do sorteio entre empatadas; sem ela, sorteia de verdade. */
+  semente?: number,
 ): string[][] {
   const grupos = numeroDeGrupos(playerIds.length, tamanho)
   if (grupos <= 1) return [playerIds.slice()]
-  const ordenadas = filaPorForca(playerIds, ratings)
+  const ordenadas = filaPorForca(playerIds, ratings, semente)
   const out: string[][] = []
   let i = 0
   for (const t of tamanhosDosGrupos(playerIds.length, grupos)) {

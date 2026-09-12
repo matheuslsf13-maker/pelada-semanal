@@ -3,6 +3,8 @@ import { AvisoDoBanco } from '../components/AvisoDoBanco'
 import ImportarLista from '../components/ImportarLista'
 import { Avatar, Empty, Modal, StatBox, Stepper, shareOrCopy } from '../components/ui'
 import {
+  aplicarAjustesDeGrupo,
+  duplasQueEntraram,
   formarGrupos,
   gruposEquilibrados,
   duplasDaFase2,
@@ -343,8 +345,15 @@ function NewPlay({
   // no modo em grupos o app decide quantos grupos cabem: quem escolhe e o
   // tamanho, e a conta sai do numero de jogadores que confirmaram
   const emDuplas = format === 'grupos-duplas'
-  /** Muda para refazer o sorteio entre as empatadas em forca. */
-  const [sorteio, setSorteio] = useState(0)
+  /**
+   * A semente do sorteio entre as empatadas em forca.
+   *
+   * E semente, e nao sorteio a cada calculo, porque os grupos sao recalculados
+   * a cada mudanca de dado -- um pagamento confirmado noutro celular ja basta
+   * -- e as empatadas trocariam de grupo sozinhas na frente de quem organiza.
+   * So o botao "sortear de novo" troca a semente.
+   */
+  const [sorteio, setSorteio] = useState(() => Math.floor(Math.random() * 2 ** 31))
   /**
    * AJUSTES NA MAO: quem foi movida e para qual grupo (indice).
    *
@@ -359,13 +368,11 @@ function NewPlay({
     if (selected.length < 8) return [selected]
     // no formato com fase 2 os grupos precisam ter a MESMA forca, senao ser 1o
     // vale mais num grupo do que no outro e a dupla da fase 2 fica injusta
-    if (emDuplas) return gruposEquilibrados(selected, forca, porGrupo)
-    if (format === 'grupos') return formarGrupos(selected, forca, porGrupo)
+    if (emDuplas) return gruposEquilibrados(selected, forca, porGrupo, sorteio)
+    if (format === 'grupos') return formarGrupos(selected, forca, porGrupo, sorteio)
     return [selected]
-    // `sorteio` nao e lido aqui de proposito: ele so existe para refazer o
-    // sorteio entre empatadas quando o botao e tocado
   }, [format, emDuplas, selected, forca, porGrupo, sorteio])
-  const grupos = useMemo(() => aplicarMovidas(gruposBase, movidas), [gruposBase, movidas])
+  const grupos = useMemo(() => aplicarAjustesDeGrupo(gruposBase, movidas), [gruposBase, movidas])
   const tamanhos = grupos.map((g) => g.length)
 
   /** A forca media do grupo, na escala de 1500 -- a que aparece nas telas. */
@@ -388,7 +395,7 @@ function NewPlay({
   }
 
   function sortearDeNovo() {
-    setSorteio((n) => n + 1)
+    setSorteio(Math.floor(Math.random() * 2 ** 31))
     setMovidas({})
     setMovendo(null)
   }
@@ -463,6 +470,10 @@ function NewPlay({
   }
 
   async function create() {
+    if (grupos.length > 1 && tamanhos.some((t) => t < 4)) {
+      onToast('Todo grupo precisa de pelo menos 4 -- ajuste os grupos antes de gerar')
+      return
+    }
     if (selected.length < 4) {
       onToast('Precisa de pelo menos 4 jogadores')
       return
@@ -1001,21 +1012,6 @@ function NewPlay({
   )
 }
 
-/**
- * Os ajustes na mao por cima dos grupos sorteados.
- *
- * Ignora o que nao vale mais: quem saiu da presenca, e grupo que nao existe
- * (o tamanho mudou). O resto continua onde o sorteio pos.
- */
-function aplicarMovidas(base: string[][], movidas: Record<string, number>): string[][] {
-  if (base.length <= 1) return base
-  const vale = (id: string) =>
-    id in movidas && movidas[id] < base.length && base.some((g) => g.includes(id))
-  const out = base.map((g) => g.filter((id) => !vale(id)))
-  for (const id of Object.keys(movidas)) if (vale(id)) out[movidas[id]].push(id)
-  return out
-}
-
 /** "2 grupos de 8" quando dao certo, "3 grupos: 7, 7 e 6" quando nao. */
 function descreverGrupos(tamanhos: number[]): string {
   const n = tamanhos.length
@@ -1184,19 +1180,27 @@ function PlayDetail({
    * conta do `alvoDe`. Nos outros formatos, e nos plays antigos, vale o
    * `desempate` unico do play.
    */
+  /** O nome da rodada da partida (Final, Semifinal, Quartas de final...). */
+  const rodadaDe = (m: Match): string => {
+    const fase = m.fase ?? 1
+    const entraram = duplasQueEntraram(session.duos ?? [], matches, fase)
+    if (entraram > 0) return nomeDaRodada(entraram)
+    // sem as duplas gravadas (play antigo) sobra contar os jogos da fase
+    const jogos = matches.filter((x) => (x.fase ?? 1) === fase && !x.disputa_3o).length
+    return jogos === 1 ? 'Final' : jogos === 2 ? 'Semifinal' : nomeDaRodada(jogos * 2)
+  }
+
+  /** Qual dos quatro alvos/desempates vale para a partida: 0 grupos, 1 duplas, 2 semi, 3 final. */
+  const degrauDe = (m: Match): 0 | 1 | 2 | 3 => {
+    if ((m.fase ?? 1) === 1) return 0
+    const nome = rodadaDe(m)
+    return nome === 'Final' ? 3 : nome === 'Semifinal' ? 2 : 1
+  }
+
   const regraDe = (m: Match): Regra => {
     const lista = session.desempates
     if (!lista?.length) return lerRegra(session.desempate)
-    const fase = m.fase ?? 1
-    if (fase === 1) return lerRegra(lista[0])
-    // a disputa de 3o nao conta: ela divide a fase com a final, e e o
-    // numero de jogos da fase que diz qual rodada e (1 = final, 2 = semi)
-    const jogosNaFase = matches.filter(
-      (x) => (x.fase ?? 1) === fase && !x.disputa_3o,
-    ).length
-    if (jogosNaFase === 1) return lerRegra(lista[3])
-    if (jogosNaFase === 2) return lerRegra(lista[2])
-    return lerRegra(lista[1])
+    return lerRegra(lista[degrauDe(m)])
   }
 
   /**
@@ -1208,25 +1212,14 @@ function PlayDetail({
   const rotuloDaPartida = (m: Match): string => {
     if (!soFase2 || (m.fase ?? 1) < 2) return ''
     if (m.disputa_3o) return '🥉 3º lugar'
-    const fase = m.fase ?? 1
-    const jogos = matches.filter((x) => (x.fase ?? 1) === fase && !x.disputa_3o).length
-    if (jogos === 1) return '🏆 Final'
-    if (jogos === 2) return 'Semifinal'
-    if (jogos === 4) return 'Quartas'
-    return `${jogos * 2} duplas`
+    const nome = rodadaDe(m)
+    return nome === 'Final' ? '🏆 Final' : nome.replace(' de final', '')
   }
 
   const alvoDe = (m: Match) => {
     const alvos = session.alvos
     if (!alvos?.length) return session.target
-    const fase = m.fase ?? 1
-    if (fase === 1) return alvos[0] ?? session.target
-    const jogosNaFase = matches.filter(
-      (x) => (x.fase ?? 1) === fase && !x.disputa_3o,
-    ).length
-    if (jogosNaFase === 1) return alvos[3] ?? session.target
-    if (jogosNaFase === 2) return alvos[2] ?? session.target
-    return alvos[1] ?? session.target
+    return alvos[degrauDe(m)] ?? session.target
   }
 
   const daFase1 = useMemo(() => matches.filter((m) => (m.fase ?? 1) === 1), [matches])
@@ -1301,8 +1294,11 @@ function PlayDetail({
 
   /** O podio do mata-mata, quando o play foi em grupos+duplas. */
   const duplasDoDia = useMemo(
-    () => (soFase2 ? rankDuplasDoDia(partidasDaFase2, nameOf, byeDoDia.porDupla) : []),
-    [soFase2, partidasDaFase2, nameOf, byeDoDia],
+    () =>
+      soFase2
+        ? rankDuplasDoDia(partidasDaFase2, nameOf, byeDoDia.porDupla, session.duos ?? undefined)
+        : [],
+    [soFase2, partidasDaFase2, nameOf, byeDoDia, session.duos],
   )
 
   const dayRows = useMemo(() => {

@@ -84,6 +84,20 @@ export function pontuaveis(sessoes: PlaySession[], matches: Match[]): Match[] {
   return matches.filter((m) => !semFase1.has(m.session_id) || (m.fase ?? 1) >= 2)
 }
 
+/**
+ * Estatisticas COMPLETAS com os pontos CERTOS.
+ *
+ * Partidas, vitorias, derrotas e games saem de todas as partidas jogadas --
+ * elas aconteceram, e sumir com elas tirava da aba de estatisticas quem so
+ * jogou a fase de grupos. Os pontos saem so das que pontuam (`pontuaveis`).
+ */
+export function computeStatsComPontos(sessoes: PlaySession[], matches: Match[]): Map<string, PlayerStat> {
+  const tudo = computeStats(matches)
+  const soPontos = computeStats(pontuaveis(sessoes, matches))
+  for (const [id, s] of tudo) s.points = soPontos.get(id)?.points ?? 0
+  return tudo
+}
+
 export function computeStats(matches: Match[]): Map<string, PlayerStat> {
   const out = new Map<string, PlayerStat>()
   const daysSeen = new Map<string, Set<string>>()
@@ -166,6 +180,14 @@ export type DuoStat = {
   bye: number
   /** Ids dos plays em que a dupla jogou. */
   sessions: Set<string>
+}
+
+/** O mesmo que `computeStatsComPontos`, para as duplas. */
+export function duoStatsComPontos(sessoes: PlaySession[], matches: Match[]): Map<string, DuoStat> {
+  const tudo = duoStats(matches)
+  const soPontos = duoStats(pontuaveis(sessoes, matches))
+  for (const [k, d] of tudo) d.points = soPontos.get(k)?.points ?? 0
+  return tudo
 }
 
 /** Todas as duplas ja formadas no periodo, agregadas. */
@@ -398,6 +420,12 @@ export function rankDuplasDoDia(
   nameOf: (id: string) => string,
   /** Pontos de bye por dupla, de `pontosDeBye().porDupla`. */
   bye?: Map<string, number>,
+  /**
+   * As duplas da chave (`session.duos`). Com elas da para saber quantas ainda
+   * estao vivas -- e so ha campea quando sobra UMA. Sem elas, vale o que
+   * apareceu nas partidas jogadas, que nao enxerga quem ainda nao jogou.
+   */
+  duos?: readonly (readonly string[])[],
 ): DuplaDoDia[] {
   const stats = bye ? aplicarByeNasDuplas(duoStats(matches), bye) : duoStats(matches)
   const ateFase = new Map<string, number>()
@@ -436,9 +464,25 @@ export function rankDuplasDoDia(
   )
   let ouro = ''
   let prata = ''
-  // so ha campea quando a ultima rodada e um jogo so e ele ja foi lancado:
-  // play parado no meio da semifinal ainda nao tem podio
-  if (finais.length === 1) {
+  /*
+   * So ha campea quando a chave ACABOU: um jogo so na ultima rodada E uma
+   * dupla so sem derrota. Esta funcao recebe apenas partidas jogadas, entao
+   * "um jogo na ultima fase" sozinho nao distingue a final de um play
+   * encerrado no meio da semifinal com uma semi lancada e a outra nao -- e
+   * ai a vencedora daquela semi sairia campea do dia.
+   */
+  const chaveDa = (d: readonly string[]) => [...d].sort().join('|')
+  const perderam = new Set<string>()
+  const apareceram = new Set<string>()
+  for (const m of matches) {
+    if (m.disputa_3o) continue
+    apareceram.add(chaveDa(m.team_a))
+    apareceram.add(chaveDa(m.team_b))
+    perderam.add(chaveDa((m.score_a as number) > (m.score_b as number) ? m.team_b : m.team_a))
+  }
+  const todas = duos?.length ? duos.map(chaveDa) : [...apareceram]
+  const vivas = todas.filter((k) => !perderam.has(k)).length
+  if (finais.length === 1 && vivas === 1) {
     const f = finais[0]
     const ganhouA = (f.score_a as number) > (f.score_b as number)
     const venceu = ganhouA ? f.team_a : f.team_b

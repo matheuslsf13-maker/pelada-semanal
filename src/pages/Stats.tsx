@@ -6,16 +6,16 @@ import {
   avgPoints,
   balance,
   computeStats,
+  computeStatsComPontos,
   duoMatches,
   type DuoStat,
-  duoStats,
+  duoStatsComPontos,
   emptyStat,
   opponentStats,
   type PairKeyStat,
   partnerStats,
   playedMatches,
   pontosDeBye,
-  pontuaveis,
   winRate,
 } from '../lib/stats'
 import {
@@ -63,9 +63,11 @@ export default function Stats({ abrir, onAbriu }: { abrir?: Modo | null; onAbriu
   const streaks = useMemo(() => computeStreaks(data), [data])
   const stats = useMemo(() => {
     const awards = period === 'all' ? streaks.awards : streaks.awards.filter((a) => a.month === period)
-    const ms = pontuaveis(data.sessions, matches)
-    const bye = pontosDeBye(data.sessions, ms).porJogadora
-    return aplicarBye(applyBonuses(computeStats(ms), awards), bye)
+    // partidas, V/D e games de TUDO (quem so jogou a fase de grupos jogou);
+    // os pontos so das partidas que pontuam
+    const stats = computeStatsComPontos(data.sessions, matches)
+    const bye = pontosDeBye(data.sessions, matches).porJogadora
+    return aplicarBye(applyBonuses(stats, awards), bye)
   }, [data.sessions, matches, streaks, period])
 
   const comJogo = useMemo(
@@ -321,7 +323,7 @@ function PainelDuplas({ matches }: { matches: ReturnType<typeof playedMatches> }
   const duplas = useMemo(
     () => [
       ...aplicarByeNasDuplas(
-        duoStats(pontuaveis(dadosDoBye.sessions, matches)),
+        duoStatsComPontos(dadosDoBye.sessions, matches),
         pontosDeBye(dadosDoBye.sessions, matches).porDupla,
       ).values(),
     ],
