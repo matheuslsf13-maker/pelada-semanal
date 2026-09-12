@@ -14,6 +14,7 @@ import {
   type Categoria,
 } from '../lib/mensalidade'
 import { ELO_INICIAL, ratings } from '../lib/stats'
+import { normalizar } from '../lib/roster'
 import { useStore } from '../lib/store'
 import { jogadoresDaPartida } from '../lib/pairing'
 import { plural, uid, type Player } from '../lib/types'
@@ -28,6 +29,8 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [juntando, setJuntando] = useState<Player | null>(null)
   const [editando, setEditando] = useState<Player | null>(null)
+  /** Filtro da lista: nome, apelido ou outra grafia, sem acento. */
+  const [busca, setBusca] = useState('')
   const [importando, setImportando] = useState(false)
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -40,7 +43,16 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
     return m
   }, [data])
 
-  const sorted = [...data.players].sort(
+  const termo = normalizar(busca)
+  const sorted = [...data.players]
+    .filter(
+      (p) =>
+        !termo ||
+        normalizar(p.name).includes(termo) ||
+        normalizar(p.nickname ?? '').includes(termo) ||
+        (p.aliases ?? []).some((a) => normalizar(a).includes(termo)),
+    )
+    .sort(
     (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'pt-BR'),
   )
 
@@ -178,8 +190,20 @@ export default function Players({ onToast }: { onToast: (m: string) => void }) {
 
       <div className="card">
         <div className="section-title">👥 Jogadores ({data.players.filter((p) => p.active).length} ativos)</div>
+        <input
+          className="input"
+          type="search"
+          placeholder="Buscar pelo nome, apelido ou outra grafia"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
         {sorted.length === 0 ? (
-          <Empty icon="👥">Cadastre os jogadores do grupo para começar.</Empty>
+          termo ? (
+            <Empty icon="🔎">Nenhum jogador com “{busca.trim()}”.</Empty>
+          ) : (
+            <Empty icon="👥">Cadastre os jogadores do grupo para começar.</Empty>
+          )
         ) : (
           <div className="stack">
             {sorted.map((p) => (
