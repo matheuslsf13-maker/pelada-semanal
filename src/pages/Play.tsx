@@ -372,6 +372,10 @@ function NewPlay({
   const mediaDeForca = (g: string[]) =>
     Math.round(g.reduce((t, id) => t + notaDeForca(forca.get(id) ?? 2), 0) / Math.max(1, g.length))
 
+  /** A soma das notas -- cresce com o tamanho do grupo, entao so compara grupos do mesmo tamanho. */
+  const somaDeForca = (g: string[]) =>
+    g.reduce((t, id) => t + notaDeForca(forca.get(id) ?? 2), 0)
+
   function mover(id: string, para: number) {
     const de = grupos.findIndex((g) => g.includes(id))
     // um rodizio precisa de quatro: tirar a quarta deixaria o grupo sem partida
@@ -919,6 +923,8 @@ function NewPlay({
                     💪 força média <strong>{mediaDeForca(g)}</strong>
                     {' · '}
                     {nivelDeForca(mediaDeForca(g)).emoji} {nivelDeForca(mediaDeForca(g)).titulo}
+                    {' · '}
+                    total <strong>{somaDeForca(g)}</strong>
                   </div>
                   <div className="row wrap" style={{ gap: 6 }}>
                     {g.map((id) => (
