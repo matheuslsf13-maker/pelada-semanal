@@ -65,7 +65,7 @@ import {
   type Regra,
   type Tie,
 } from '../lib/desempate'
-import { ajusteDeEntrosamento } from '../lib/forca'
+import { ajusteDeEntrosamento, nivelDeForca, notaDeForca } from '../lib/forca'
 import { computeStreaks, podiosDoDia, streakLevel, vagasDoPodio } from '../lib/streaks'
 import {
   CATEGORIAS,
@@ -343,15 +343,51 @@ function NewPlay({
   // no modo em grupos o app decide quantos grupos cabem: quem escolhe e o
   // tamanho, e a conta sai do numero de jogadores que confirmaram
   const emDuplas = format === 'grupos-duplas'
-  const grupos = useMemo(() => {
+  /** Muda para refazer o sorteio entre as empatadas em forca. */
+  const [sorteio, setSorteio] = useState(0)
+  /**
+   * AJUSTES NA MAO: quem foi movida e para qual grupo (indice).
+   *
+   * O app so conhece a forca de quem ja jogou; organizador conhece o resto.
+   * Os ajustes ficam por cima do sorteio e sobrevivem a marcar mais uma
+   * presenca -- so um novo sorteio limpa tudo.
+   */
+  const [movidas, setMovidas] = useState<Record<string, number>>({})
+  /** Quem esta selecionada para mudar de grupo. */
+  const [movendo, setMovendo] = useState<string | null>(null)
+  const gruposBase = useMemo(() => {
     if (selected.length < 8) return [selected]
     // no formato com fase 2 os grupos precisam ter a MESMA forca, senao ser 1o
     // vale mais num grupo do que no outro e a dupla da fase 2 fica injusta
     if (emDuplas) return gruposEquilibrados(selected, forca, porGrupo)
     if (format === 'grupos') return formarGrupos(selected, forca, porGrupo)
     return [selected]
-  }, [format, emDuplas, selected, forca, porGrupo])
+    // `sorteio` nao e lido aqui de proposito: ele so existe para refazer o
+    // sorteio entre empatadas quando o botao e tocado
+  }, [format, emDuplas, selected, forca, porGrupo, sorteio])
+  const grupos = useMemo(() => aplicarMovidas(gruposBase, movidas), [gruposBase, movidas])
   const tamanhos = grupos.map((g) => g.length)
+
+  /** A forca media do grupo, na escala de 1500 -- a que aparece nas telas. */
+  const mediaDeForca = (g: string[]) =>
+    Math.round(g.reduce((t, id) => t + notaDeForca(forca.get(id) ?? 2), 0) / Math.max(1, g.length))
+
+  function mover(id: string, para: number) {
+    const de = grupos.findIndex((g) => g.includes(id))
+    // um rodizio precisa de quatro: tirar a quarta deixaria o grupo sem partida
+    if (de >= 0 && grupos[de].length <= 4) {
+      onToast('O grupo ' + (de + 1) + ' ficaria com menos de 4 -- não dá para tirar ninguém dele')
+      return
+    }
+    setMovidas((m) => ({ ...m, [id]: para }))
+    setMovendo(null)
+  }
+
+  function sortearDeNovo() {
+    setSorteio((n) => n + 1)
+    setMovidas({})
+    setMovendo(null)
+  }
 
   // as quadras saem dos GRUPOS, nao do total: cada partida precisa de quatro do
   // mesmo grupo, entao dois grupos de 6 (12 jogadores) enchem duas quadras e nao
@@ -876,10 +912,57 @@ function NewPlay({
             <div className="stack" style={{ marginTop: 4 }}>
               {grupos.map((g, i) => (
                 <div key={i} className={`grupo-box ${classeDoGrupo(i + 1)}`}>
-                  <div className="grupo-nome">Grupo {i + 1} · {g.length} jogadores · {partidasDoRodizio(g.length)} partidas</div>
-                  <div className="tiny">{g.map(nameOf).join(' · ')}</div>
+                  <div className="grupo-nome">
+                    Grupo {i + 1} · {g.length} jogadores · {partidasDoRodizio(g.length)} partidas
+                  </div>
+                  <div className="tiny muted" style={{ marginBottom: 6 }}>
+                    💪 força média <strong>{mediaDeForca(g)}</strong>
+                    {' · '}
+                    {nivelDeForca(mediaDeForca(g)).emoji} {nivelDeForca(mediaDeForca(g)).titulo}
+                  </div>
+                  <div className="row wrap" style={{ gap: 6 }}>
+                    {g.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`chip ${movendo === id ? 'on' : ''}`}
+                        onClick={() => setMovendo(movendo === id ? null : id)}
+                      >
+                        {nameOf(id)}
+                        <span className="tiny muted" style={{ fontWeight: 600 }}>
+                          {notaDeForca(forca.get(id) ?? 2)}
+                        </span>
+                        {id in movidas ? ' ✏️' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  {movendo && !g.includes(movendo) && (
+                    <button
+                      type="button"
+                      className="btn ghost sm block"
+                      style={{ marginTop: 8 }}
+                      onClick={() => mover(movendo, i)}
+                    >
+                      ↪️ Mover {nameOf(movendo)} para o grupo {i + 1}
+                    </button>
+                  )}
                 </div>
               ))}
+              <div className="row" style={{ gap: 8 }}>
+                <button type="button" className="btn ghost sm grow" onClick={sortearDeNovo}>
+                  🎲 Sortear de novo
+                </button>
+                {Object.keys(movidas).length > 0 && (
+                  <button type="button" className="btn ghost sm grow" onClick={() => setMovidas({})}>
+                    ↩️ Desfazer ajustes
+                  </button>
+                )}
+              </div>
+              <em className="hint">
+                Toque num jogador e escolha o grupo para onde ele vai. Quem já jogou entra pela
+                força; quem está empatado (os estreantes) é sorteado, e cada “sortear de
+                novo” muda esse sorteio.
+              </em>
             </div>
           )}
         </div>
@@ -910,6 +993,21 @@ function NewPlay({
       </button>
     </>
   )
+}
+
+/**
+ * Os ajustes na mao por cima dos grupos sorteados.
+ *
+ * Ignora o que nao vale mais: quem saiu da presenca, e grupo que nao existe
+ * (o tamanho mudou). O resto continua onde o sorteio pos.
+ */
+function aplicarMovidas(base: string[][], movidas: Record<string, number>): string[][] {
+  if (base.length <= 1) return base
+  const vale = (id: string) =>
+    id in movidas && movidas[id] < base.length && base.some((g) => g.includes(id))
+  const out = base.map((g) => g.filter((id) => !vale(id)))
+  for (const id of Object.keys(movidas)) if (vale(id)) out[movidas[id]].push(id)
+  return out
 }
 
 /** "2 grupos de 8" quando dao certo, "3 grupos: 7, 7 e 6" quando nao. */

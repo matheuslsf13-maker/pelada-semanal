@@ -23,6 +23,12 @@ export type Player = {
   pago_mes?: string | null
   /** Avulso: credito de UMA participacao, gasto quando o play e finalizado. */
   pago_avulso?: boolean | null
+  /**
+   * De onde o Elo parte para esta pessoa (escala de 1500). Vazio = 1500, o
+   * meio da escala. Quem organiza pode ajustar no cadastro quando ja sabe o
+   * nivel -- ver `ratings()`.
+   */
+  forca_inicial?: number | null
 }
 
 export type SessionStatus = 'open' | 'finished'

@@ -83,6 +83,19 @@ supabase/*.sql   migrações, rodadas na ordem numérica no SQL Editor
   se enfrentou até ali — o alvo é espalhar, não zerar (é impossível zerar).
 - **Três formatos**, escolhidos ao criar o play. O terceiro,
   **`grupos-duplas`**, tem duas fases:
+  - **Grupo é por força; empate é sorteio; e quem organiza tem a última palavra.**
+    `formarGrupos`/`gruposEquilibrados` ordenam pela força, e quem está **empatado**
+    (todo estreante entra com a mesma nota) é **embaralhado antes** (`filaPorForca`)
+    — sem isso o desempate era a ordem da lista de presença, e refazer o play dava
+    sempre os mesmos grupos. No cartão dos grupos dá para **tocar num jogador e
+    movê-lo** (`movidas`, por cima do sorteio; um grupo nunca fica com menos de 4) e
+    **sortear de novo**. Cada chip mostra a nota e o cabeçalho a média do grupo.
+  - **A força inicial é escolhida no cadastro** (`players.forca_inicial`, script 13).
+    O padrão é **1500, o meio da escala — não a média dos cadastrados**: o Elo é soma
+    zero, então a média fica em 1500 sozinha enquanto todos partirem dali. Dar outro
+    ponto de partida é contar ao app o que ele ainda não sabe; o histórico é
+    **recalculado a partir do novo ponto** (`ratings()`), por isso o campo continua
+    editável no perfil.
   - *Fase 1*: grupos **equilibrados entre si** (`gruposEquilibrados`, serpentina)
     — não é a divisão por nível dos outros formatos. Ser 1º precisa custar o
     mesmo em qualquer grupo, senão a fase 2 fica injusta. Dentro do grupo, o

@@ -251,7 +251,7 @@ export function opponentStats(matches: Match[]): Map<string, Map<string, PairKey
  */
 
 /** Todo mundo comeca na media; o valor em si nao importa, so as diferencas. */
-const ELO_INICIAL = 1500
+export const ELO_INICIAL = 1500
 /** Quanto uma partida move a nota. Entre 12 e 60 o resultado quase nao muda. */
 const ELO_K = 24
 /** Quantos pontos de Elo valem 1 ponto na escala 0-4 que o resto do app usa. */
@@ -280,8 +280,20 @@ export function ratings(data: AppData, upToDate?: string): Map<string, number> {
       )
     })
 
+  /*
+   * DE ONDE CADA PESSOA PARTE
+   *
+   * O padrao e 1500, o meio da escala -- e nao a media de quem esta cadastrado:
+   * como o Elo e soma zero, a media do grupo fica em 1500 sozinha enquanto
+   * todo mundo partir dali. Quem organiza pode dar um ponto de partida
+   * diferente no cadastro, quando ja conhece o nivel; a partir dai as partidas
+   * mandam do mesmo jeito.
+   */
+  const inicial = new Map(
+    data.players.map((p) => [p.id, p.forca_inicial ?? ELO_INICIAL] as const),
+  )
   const elo = new Map<string, number>()
-  const nota = (id: string) => elo.get(id) ?? ELO_INICIAL
+  const nota = (id: string) => elo.get(id) ?? inicial.get(id) ?? ELO_INICIAL
 
   for (const m of jogos) {
     const ga = m.score_a as number

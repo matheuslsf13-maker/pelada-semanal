@@ -87,6 +87,21 @@ export function tamanhosDosGrupos(jogadores: number, grupos: number): number[] {
 }
 
 /**
+ * A fila por forca, com SORTEIO ENTRE EMPATADAS.
+ *
+ * Quem nunca jogou entra com a nota padrao -- todas iguais. Sem isto o
+ * desempate era a ordem em que entraram na lista de presenca, entao refazer o
+ * play dava sempre os mesmos grupos, e tres estreantes caiam no grupo forte e
+ * tres no fraco por ordem alfabetica, fingindo um nivel que o app nao conhece.
+ *
+ * Embaralhar ANTES de ordenar e o truque: o sort e estavel, entao quem tem nota
+ * diferente vai para o lugar certo e so as empatadas ficam na ordem sorteada.
+ */
+function filaPorForca(playerIds: string[], ratings: Map<string, number>): string[] {
+  return shuffle(playerIds).sort((a, b) => (ratings.get(b) ?? 2) - (ratings.get(a) ?? 2))
+}
+
+/**
  * Grupos EQUILIBRADOS entre si, para o formato `grupos-duplas`.
  *
  * Diferente do `formarGrupos`, onde o grupo 1 leva os melhores de proposito.
@@ -104,7 +119,7 @@ export function gruposEquilibrados(
 ): string[][] {
   const grupos = numeroDeGrupos(playerIds.length, tamanho)
   if (grupos <= 1) return [playerIds.slice()]
-  const ordenados = [...playerIds].sort((a, b) => (ratings.get(b) ?? 2) - (ratings.get(a) ?? 2))
+  const ordenados = filaPorForca(playerIds, ratings)
   const out: string[][] = Array.from({ length: grupos }, () => [])
   ordenados.forEach((id, i) => {
     const volta = Math.floor(i / grupos)
@@ -233,7 +248,7 @@ export function formarGrupos(
 ): string[][] {
   const grupos = numeroDeGrupos(playerIds.length, tamanho)
   if (grupos <= 1) return [playerIds.slice()]
-  const ordenadas = [...playerIds].sort((a, b) => (ratings.get(b) ?? 2) - (ratings.get(a) ?? 2))
+  const ordenadas = filaPorForca(playerIds, ratings)
   const out: string[][] = []
   let i = 0
   for (const t of tamanhosDosGrupos(playerIds.length, grupos)) {
