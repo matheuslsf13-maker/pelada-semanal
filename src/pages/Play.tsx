@@ -1360,6 +1360,8 @@ function PlayDetail({
   const doneCount = matches.filter(isPlayed).length
   const finished = session.status === 'finished'
   const grupos = session.groups ?? null
+  /** A forca de cada pessoa na data do play, como ela estava ao montar os grupos. */
+  const forcaDoDia = useMemo(() => ratings(data, session.date), [data, session.date])
   const grupoDe = useMemo(() => {
     const map = new Map<string, number>()
     grupos?.forEach((g, i) => g.forEach((id) => map.set(id, i + 1)))
@@ -1880,12 +1882,26 @@ function PlayDetail({
         <div className="card">
           <div className="section-title">👥 Grupos</div>
           <div className="stack">
-            {grupos.map((g, i) => (
-              <div key={i} className={`grupo-box ${classeDoGrupo(i + 1)}`}>
-                <div className="grupo-nome">Grupo {i + 1} · {g.length} jogadores</div>
-                <div className="tiny">{g.map(nameOf).join(' · ')}</div>
-              </div>
-            ))}
+            {grupos.map((g, i) => {
+              const notas = g.map((id) => notaDeForca(forcaDoDia.get(id) ?? 2))
+              const total = notas.reduce((t, x) => t + x, 0)
+              const media = Math.round(total / Math.max(1, g.length))
+              return (
+                <div key={i} className={`grupo-box ${classeDoGrupo(i + 1)}`}>
+                  <div className="grupo-nome">Grupo {i + 1} · {g.length} jogadores</div>
+                  <div className="tiny muted" style={{ marginBottom: 4 }}>
+                    💪 força média <strong>{media}</strong>
+                    {' · '}
+                    {nivelDeForca(media).emoji} {nivelDeForca(media).titulo}
+                    {' · '}
+                    total <strong>{total}</strong>
+                  </div>
+                  <div className="tiny">
+                    {g.map((id, k) => `${nameOf(id)} ${notas[k]}`).join(' · ')}
+                  </div>
+                </div>
+              )
+            })}
           </div>
           <p className="tiny muted" style={{ marginBottom: 0 }}>
             Cada grupo é um rodízio próprio e tem o seu pódio (1º, 2º e 3º). Os pontos continuam
