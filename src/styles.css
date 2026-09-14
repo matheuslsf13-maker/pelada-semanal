@@ -1105,6 +1105,11 @@ textarea.input { line-height: 1.45; }
    outros campos do formulario */
 .fase-box .stepper { width: 100%; }
 
+/* opcao do entra/sai: radio + texto lado a lado; apagada quando nao se aplica */
+label.fase-box { display: flex; align-items: flex-start; cursor: pointer; }
+label.fase-box input[type='radio'] { margin-top: 3px; flex: none; }
+.fase-box.off { opacity: .45; cursor: default; }
+
 /* ---------- escolha em lista (formato do play) ----------
    Tres opcoes com nome longo nao cabem num `segmented` de celular: as palavras
    quebram no meio e a escolha mais importante da tela vira a mais bagunçada.
